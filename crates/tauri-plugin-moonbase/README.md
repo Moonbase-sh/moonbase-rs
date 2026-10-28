@@ -7,6 +7,13 @@ offer when a license doesn't cover the running version, watches for expiry and f
 other instances, and presents a finished, themeable activation window whenever the app
 is locked.
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Moonbase-sh/moonbase-rs/main/assets/activation-welcome.png" width="49%"
+       alt="The activation window in the Aurora example: the Aurora logo and 'Halcyon Tools', 'Activate Aurora', an 'Activate online' button, a 'No internet? Activate offline' link, and a 'Licensing secured by moonbase' footer.">
+  <img src="https://raw.githubusercontent.com/Moonbase-sh/moonbase-rs/main/assets/activation-details.png" width="49%"
+       alt="The license details screen: an 'Active' pill, licensed to, email, plan and license ID with a Copy button, an activations card showing 4 of 27 devices with a 'Deactivate this device' button, and an Add-ons row.">
+</p>
+
 ```rust
 use tauri_plugin_moonbase::UiConfig;
 

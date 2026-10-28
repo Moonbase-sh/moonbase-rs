@@ -39,6 +39,10 @@ example next to `@moonbase.sh/licensing` on macOS, Windows and Linux runners and
 requires the two ids to match. Any two conforming SDKs compute the same id on a given
 machine, so a license activated through one validates in the others.
 
+Conformance is per SDK: this one conforms from its first release, 0.1.0;
+moonbase-cpp from 4.0.0; `@moonbase.sh/licensing` from 3.0.0. Check the version of
+whichever SDK you are pairing with before relying on it.
+
 ## Stability
 
 The id survives a rename, a locale change, a firmware update, a RAM or disk swap, a
