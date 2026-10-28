@@ -139,8 +139,9 @@ A release:
 1. Works out the version from the commits since the last `v*` tag.
 2. Writes `CHANGELOG.md`, and the version everywhere it lives
    (`scripts/bump-version.sh`): the workspace version and its dependency table in
-   `Cargo.toml`, `Cargo.lock`, the frontend bindings' `package.json`, and the tag the
-   install snippets in `README.md`, `docs/core-sdk.md` and `docs/tauri.md` pin.
+   `Cargo.toml`, `Cargo.lock`, the frontend bindings' `package.json`, and the version
+   (major.minor) the install snippets in `README.md`, `docs/core-sdk.md` and
+   `docs/tauri.md` name.
 3. Commits that as `chore(release): x.y.z [skip ci]`, tags it `vx.y.z`, and pushes both.
 4. Publishes both crates to crates.io (`scripts/publish-crates.sh`), when the workflow
    has a token for it, and creates the GitHub release.

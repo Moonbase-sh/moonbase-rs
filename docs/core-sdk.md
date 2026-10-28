@@ -28,7 +28,7 @@ cargo run -p moonbase --example device_id    # this machine's device id, as JSON
 
 ```toml
 [dependencies]
-moonbase = { git = "https://github.com/Moonbase-sh/moonbase-rs", tag = "v0.1.0" }
+moonbase = "0.1"
 ```
 
 | Feature | Default | Purpose |

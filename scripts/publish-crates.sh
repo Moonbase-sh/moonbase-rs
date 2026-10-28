@@ -7,12 +7,13 @@
 #
 # The token comes from crates.io's trusted publishing, or a CARGO_REGISTRY_TOKEN
 # secret (see .github/workflows/release.yml). Without one the release is cut, and
-# tagged, without publishing.
+# tagged, without publishing, and the run carries a warning saying so: a release that
+# is green but never reached crates.io is easy to miss otherwise.
 
 set -euo pipefail
 
 if [[ -z "${CARGO_REGISTRY_TOKEN:-}" ]]; then
-    echo "publish-crates.sh: no crates.io token, so the crates are not published"
+    echo "::warning title=crates.io::No crates.io token, so the crates were not published (see Publishing to crates.io in CONTRIBUTING.md)"
     exit 0
 fi
 

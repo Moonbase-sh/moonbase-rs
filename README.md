@@ -52,7 +52,7 @@ so a license activated through any of them validates in the others.
 
 ```toml
 [dependencies]
-moonbase = { git = "https://github.com/Moonbase-sh/moonbase-rs", tag = "v0.1.0" }
+moonbase = "0.1"
 ```
 
 ```rust

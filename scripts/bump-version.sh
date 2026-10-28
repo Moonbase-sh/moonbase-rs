@@ -75,7 +75,9 @@ require_file "$package_json"
 edit "$package_json" "s/^(  \"version\": \")[0-9]+\.[0-9]+\.[0-9]+(\")/\1${new_version}\2/"
 check "$package_json" "^  \"version\": \"${new_version}\"" "the package version"
 
-# The release tag the install snippets pin.
+# The version the install snippets name, as major.minor: at 0.x a breaking change
+# bumps the minor, so a snippet left at the old one would hold readers back.
+snippet_version="${new_version%.*}"
 pinned_files=(
     "README.md"
     "docs/core-sdk.md"
@@ -83,6 +85,6 @@ pinned_files=(
 )
 for rel in "${pinned_files[@]}"; do
     require_file "$rel"
-    edit "$rel" "s|(github\.com/Moonbase-sh/moonbase-rs\", tag = \"v)[0-9]+\.[0-9]+\.[0-9]+|\1${new_version}|"
-    check "$rel" "moonbase-rs\", tag = \"v${new_version}\"" "the pinned tag"
+    edit "$rel" "s|^((tauri-plugin-)?moonbase = \")[0-9]+\.[0-9]+\"|\1${snippet_version}\"|"
+    check "$rel" "^(tauri-plugin-)?moonbase = \"${snippet_version}\"$" "the install snippet's version"
 done
