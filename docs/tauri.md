@@ -435,7 +435,10 @@ From Rust, `check_update()` and `update_download_url()` do the same, and
 ## What runs in the background
 
 - **At startup** the stored license is validated, online when it is due. An expired
-  offline license is removed; an expired trial shows as `trialExpired`; a license that
+  online license is always checked online first, so a subscription renewed or a trial
+  extended or bought while the app was closed opens as it is now; if Moonbase confirms
+  the expiry or can't be reached, an expired trial shows as `trialExpired` and any other
+  license locks as `expired`. An expired offline license is removed; a license that
   doesn't cover this version shows as `notCovered`; a license bound to another device
   locks as `invalid`; one that cannot be checked past the grace period locks as
   `unverified`. A network failure inside the grace period keeps it.
@@ -443,11 +446,11 @@ From Rust, `check_update()` and `update_download_url()` do the same, and
   good, or is cancelled.
 - **Every 2 seconds**, with no network, the license file is checked for changes made
   by another instance or process (activated, refreshed or removed elsewhere is picked
-  up), and the license's deadlines are checked: a passed `exp` locks it, and past the
-  grace period it gets one more online check before locking. An add-on that runs out
-  changes the state, and gets one online check in case it was bought or renewed. A day
-  going by on a countdown (trial days left) changes the state too, so a screen left open
-  keeps up.
+  up), and the license's deadlines are checked: when its `exp` passes, or the grace
+  period runs out, it gets one online check before locking, in case it was renewed. An
+  add-on that runs out changes the state, and gets one online check in case it was
+  bought or renewed. A day going by on a countdown (trial days left) changes the state
+  too, so a screen left open keeps up.
 - **After an add-on's buy link opened**, coming back to the app from the browser
   re-checks the license and lists the add-ons again.
 - **On exit** waits for another process's license lock are cancelled, so quitting is

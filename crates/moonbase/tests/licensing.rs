@@ -178,6 +178,9 @@ fn never_contacts_the_api_for_offline_tokens() {
     let f = fixture([]);
     let token = make_token(&with(validated_ago(ONE_YEAR), "method", json!("Offline")));
     assert_eq!(f.licensing.validate_token_online(&token).unwrap().method, ActivationMethod::Offline);
+    // Nor once one has expired: nothing renews it.
+    let expired = make_token(&with(with(claims(), "method", json!("Offline")), "exp", json!(now_seconds() - MINUTE)));
+    assert!(matches!(f.licensing.validate_token_online(&expired), Err(Error::LicenseExpired(_))));
     assert_eq!(f.transport.request_count(), 0);
 }
 
@@ -185,6 +188,9 @@ fn never_contacts_the_api_for_offline_tokens() {
 fn runs_local_validation_before_any_http_call() {
     let f = fixture([]);
     let token = make_token(&with(claims_for("other-device"), "validated", json!(now_seconds() - 10 * MINUTE)));
+    assert!(f.licensing.validate_token_online(&token).unwrap_err().is_license_invalid());
+    // An expired one is asked about only once the rest of it holds up.
+    let token = make_token(&with(claims_for("other-device"), "exp", json!(now_seconds() - MINUTE)));
     assert!(f.licensing.validate_token_online(&token).unwrap_err().is_license_invalid());
     assert_eq!(f.transport.request_count(), 0);
 }
@@ -216,6 +222,64 @@ fn prefers_the_freshest_stored_license_when_reloading_under_the_lock() {
 
     let license = f.licensing.validate_token_online(&make_token(&validated_ago(10 * MINUTE))).unwrap();
     assert_eq!(license.token, fresh);
+    assert_eq!(f.transport.request_count(), 0);
+}
+
+/// Claims that expired `ago` seconds ago, last validated `validated` seconds ago.
+fn expired(ago: i64, validated: i64) -> serde_json::Value {
+    with(validated_ago(validated), "exp", json!(now_seconds() - ago))
+}
+
+#[test]
+fn an_expired_license_is_checked_with_moonbase_whatever_the_throttle() {
+    // Checked two minutes ago, inside the min interval, and expired since: only
+    // Moonbase knows whether the subscription renewed meanwhile.
+    let token = make_token(&expired(MINUTE, 2 * MINUTE));
+    let renewed = make_token(&validated_ago(0));
+    let f = fixture([ok(renewed.clone())]);
+
+    assert_eq!(f.licensing.validate_token_online(&token).unwrap().token, renewed);
+    let requests = f.transport.requests();
+    assert!(requests[0].url.contains("/api/client/licenses/demo-app/validate"));
+    assert_eq!(requests[0].body, token);
+    assert_eq!(f.store.load_local_license().unwrap().unwrap().token, renewed);
+}
+
+#[test]
+fn an_expiry_stands_when_moonbase_confirms_it_or_cant_be_asked() {
+    let confirmed = HttpResponse::new(400, r#"{"errorType":"LicenseExpired","detail":"The license has expired"}"#);
+    for response in
+        [Some(confirmed), Some(HttpResponse::new(500, "")), Some(HttpResponse::new(410, STORE_CLOSED)), None]
+    {
+        // Well inside the grace period, which rides out an outage but never an expiry.
+        let f = fixture(response);
+        let error = f.licensing.validate_token_online(&make_token(&expired(MINUTE, 10 * MINUTE))).unwrap_err();
+        assert!(matches!(error, Error::LicenseExpired(_)), "{error:?}");
+        assert_eq!(f.transport.request_count(), 1);
+        assert_eq!(f.store.load_local_license().unwrap(), None);
+    }
+}
+
+#[test]
+fn an_expiry_stands_when_the_store_cant_be_locked() {
+    let store = Arc::new(TrackingStore { fail_lock: true, ..TrackingStore::default() });
+    let f = fixture_with(options(), [], store, "Test Device", DEVICE_ID);
+    let error = f.licensing.validate_token_online(&make_token(&expired(MINUTE, 10 * MINUTE))).unwrap_err();
+    assert!(matches!(error, Error::LicenseExpired(_)), "{error:?}");
+    // A license that hasn't expired reports the store's failure.
+    let error = f.licensing.validate_token_online(&make_token(&validated_ago(10 * MINUTE))).unwrap_err();
+    assert!(matches!(error, Error::Storage(_)), "{error:?}");
+    assert_eq!(f.transport.request_count(), 0);
+}
+
+#[test]
+fn an_expired_copy_takes_the_renewal_another_instance_stored() {
+    let f = fixture([]);
+    let renewed = make_token(&validated_ago(10));
+    f.store.store_local_license(&f.licensing.validate_token_local(&renewed).unwrap()).unwrap();
+
+    let license = f.licensing.validate_token_online(&make_token(&expired(MINUTE, 2 * 3600))).unwrap();
+    assert_eq!(license.token, renewed);
     assert_eq!(f.transport.request_count(), 0);
 }
 
@@ -298,6 +362,7 @@ struct TrackingStore {
     locks: AtomicUsize,
     value: Mutex<Option<License>>,
     fail_io: bool,
+    fail_lock: bool,
 }
 
 impl LicenseStore for TrackingStore {
@@ -323,6 +388,9 @@ impl LicenseStore for TrackingStore {
 
     fn lock_for_update(&self) -> moonbase::Result<Option<StoreLockGuard<'_>>> {
         self.locks.fetch_add(1, Ordering::SeqCst);
+        if self.fail_lock {
+            return Err(moonbase::StorageError::new("lock failed").into());
+        }
         Ok(Some(StoreLockGuard::new(())))
     }
 }
@@ -557,6 +625,28 @@ fn load_and_validate_answers_for_what_is_stored() {
     f.transport.push(ok(refreshed.clone()));
     assert_eq!(f.licensing.load_and_validate().unwrap().unwrap().token, refreshed);
     assert_eq!(f.store.load_local_license().unwrap().unwrap().token, refreshed);
+}
+
+#[test]
+fn load_and_validate_checks_an_expired_license_with_moonbase() {
+    // A subscription that renewed, and a trial that was bought, while the app was
+    // closed: Moonbase answers for both with the license as it is now.
+    for (stored, answer) in [
+        (expired(24 * 3600, 3 * 24 * 3600), validated_ago(0)),
+        (
+            with(expired(24 * 3600, 3 * 24 * 3600), "trial", json!(true)),
+            with(validated_ago(0), "id", json!("activation-456")),
+        ),
+    ] {
+        let answer = make_token(&answer);
+        let f = fixture([ok(answer.clone())]);
+        let stored = f.licensing.validate_token_local_allow_expired(&make_token(&stored)).unwrap();
+        f.store.store_local_license(&stored).unwrap();
+
+        assert_eq!(f.licensing.load_and_validate().unwrap().unwrap().token, answer);
+        assert_eq!(f.store.load_local_license().unwrap().unwrap().token, answer);
+        assert_eq!(f.transport.request_count(), 1);
+    }
 }
 
 #[test]

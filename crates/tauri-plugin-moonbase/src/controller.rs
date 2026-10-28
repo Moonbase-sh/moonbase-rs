@@ -409,8 +409,10 @@ fn check_stored_license(
         return outcome;
     }
 
-    // Persist the refresh only while nothing has superseded the check, so a license
-    // the user cleared meanwhile is not written back.
+    // Expired or not: one that has may have been renewed while the app was closed,
+    // which the SDK asks Moonbase about before it says so. Persist the refresh only
+    // while nothing has superseded the check, so a license the user cleared
+    // meanwhile is not written back.
     match licensing.validate_token_online_with(&stored.token, still_current) {
         Ok(license) => outcome.license = Some(license),
         Err(SdkError::ReleaseNotCovered(refusal)) => {
@@ -1911,8 +1913,10 @@ impl<R: Runtime> Moonbase<R> {
         }
         drop(inner);
 
-        // A passed `exp` locks without a request (a trial shows as expired); past
-        // the grace period the server gets one more chance.
+        // A passed `exp` gets one request, as a subscription may have renewed or a
+        // trial been extended or bought, and locks (a trial shows as expired)
+        // unless that brings a license still running; past the grace period the
+        // server gets one more chance too.
         if let Err(error) = self.refresh(false) {
             log::debug!("moonbase: the deadline re-check failed: {error}");
         }

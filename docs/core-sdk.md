@@ -155,6 +155,13 @@ refusal not to delete it for. Two options govern the check:
 A verdict (`Error::is_license_rejection()`: invalid, bound to another device, not for
 this version, or expired) always propagates. Offline licenses never contact the API.
 
+An online license whose expiry has passed is asked about before it fails, whatever the
+throttle: a subscription may have renewed, or a trial been extended or bought, since
+the token was issued, so a license renewed while the app was closed opens with the
+renewed copy, which is stored. When Moonbase confirms the expiry, or can't be reached,
+it fails with `Error::LicenseExpired`: the grace period rides out an outage, not an
+expiry. An expired offline license fails without a request.
+
 Concurrent callers take turns. Within the process a mutex serializes them; across
 processes the store's lock does, and a later caller reloads the store under the lock,
 sees the license the earlier one just refreshed, and skips the API. Ten windows
@@ -509,3 +516,9 @@ Deliberate differences:
   unlocked since boot) heals itself.
 - There is no `legacy_cpp_device_id_resolver`: a new SDK has no fleet bound to the
   pre-spec algorithm.
+- `validate_token_online`, and so `load_and_validate`, asks Moonbase about an online
+  license whose expiry has passed rather than failing with `LicenseExpired` on the
+  device, so a subscription renewed, or a trial extended or bought, while the app was
+  closed carries on. Without an answer the expiry stands, as before. A token that has
+  expired and is bound to another device also fails as `DeviceMismatch` now, rather
+  than `LicenseExpired`.
