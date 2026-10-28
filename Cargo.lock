@@ -2106,7 +2106,7 @@ dependencies = [
 
 [[package]]
 name = "moonbase"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "base64 0.22.1",
  "ring",
@@ -3724,7 +3724,7 @@ dependencies = [
 
 [[package]]
 name = "tauri-plugin-moonbase"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "base64 0.22.1",
  "log",
