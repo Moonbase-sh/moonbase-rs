@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-upgrade-license"
+description = "Enables the upgrade_license command without any pre-configured scope."
+commands.allow = ["upgrade_license"]
+
+[[permission]]
+identifier = "deny-upgrade-license"
+description = "Denies the upgrade_license command without any pre-configured scope."
+commands.deny = ["upgrade_license"]

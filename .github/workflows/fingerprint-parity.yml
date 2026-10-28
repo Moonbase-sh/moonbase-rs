@@ -1,0 +1,86 @@
+name: Fingerprint parity
+
+# Prove on real hardware, on every OS, that this SDK computes the same device id
+# as @moonbase.sh/licensing.
+#
+# The conformance vectors prove the algorithm agrees given identical inputs. They
+# cannot prove the platform readers agree, because those are the half that touches
+# the machine: which SMBIOS structure the firmware returns, whether IOKit sees what
+# ioreg sees, which machine-id source wins. A whole platform's reader can be wrong
+# while every vector passes, and the symptom would be a customer whose license
+# works in a web app and not in a desktop app.
+#
+# Path-filtered, because it only has something to say when the fingerprint moves.
+# Run it by hand after a @moonbase.sh/licensing release, which can break parity
+# without anything here changing.
+
+on:
+  pull_request:
+    paths:
+      - 'crates/moonbase/src/fingerprint_spec.rs'
+      - 'crates/moonbase/src/resolver.rs'
+      - 'crates/moonbase/src/platform/**'
+      - 'crates/moonbase/tests/vectors/fingerprint-vectors.json'
+      - 'crates/moonbase/tests/vectors/release-access-vectors.json'
+      - 'crates/moonbase/examples/device_id.rs'
+      - '.github/workflows/fingerprint-parity.yml'
+      - '.github/scripts/check-fingerprint-parity.mjs'
+  push:
+    branches: [main]
+    paths:
+      - 'crates/moonbase/src/fingerprint_spec.rs'
+      - 'crates/moonbase/src/resolver.rs'
+      - 'crates/moonbase/src/platform/**'
+      - 'crates/moonbase/tests/vectors/fingerprint-vectors.json'
+      - 'crates/moonbase/tests/vectors/release-access-vectors.json'
+      - 'crates/moonbase/examples/device_id.rs'
+      - '.github/workflows/fingerprint-parity.yml'
+      - '.github/scripts/check-fingerprint-parity.mjs'
+  workflow_dispatch:
+
+concurrency:
+  group: fingerprint-parity-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  parity:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      # Installed beside the script rather than at the repository root, so a bare
+      # ESM import resolves it, and so no manifest pins the reference SDK: the
+      # point is to compare against what is published now.
+      - name: Install the reference SDK
+        shell: bash
+        run: |
+          npm install --no-audit --no-fund --prefix .github/scripts '@moonbase.sh/licensing@^3'
+          node -p "'reference: @moonbase.sh/licensing@' + require('./.github/scripts/node_modules/@moonbase.sh/licensing/package.json').version"
+
+      - name: The reference SDK's vectors match ours
+        shell: bash
+        run: |
+          reference=.github/scripts/node_modules/@moonbase.sh/licensing
+          cmp "$reference/fingerprint-vectors.json" crates/moonbase/tests/vectors/fingerprint-vectors.json
+          # Which versions a license that covers only some of them covers. Every SDK
+          # and the backend must agree on these too.
+          cmp "$reference/release-access-vectors.json" crates/moonbase/tests/vectors/release-access-vectors.json
+
+      - name: This SDK's device id
+        shell: bash
+        run: cargo run -q -p moonbase --example device_id > native-device-id.json && cat native-device-id.json
+
+      - name: Compare
+        shell: bash
+        run: node .github/scripts/check-fingerprint-parity.mjs native-device-id.json

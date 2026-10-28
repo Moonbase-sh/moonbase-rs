@@ -1,0 +1,25 @@
+[package]
+name = "aurora"
+description = "Aurora: a palette generator showing Moonbase licensing in a Tauri app"
+version = "1.0.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+name = "aurora_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { workspace = true, features = [] }
+
+[dependencies]
+log = "0.4"
+serde = { workspace = true }
+serde_json = { workspace = true }
+tauri = { workspace = true, features = [] }
+tauri-plugin-dialog = { workspace = true }
+tauri-plugin-log = "2"
+tauri-plugin-moonbase = { workspace = true }
+tauri-plugin-opener = { workspace = true }

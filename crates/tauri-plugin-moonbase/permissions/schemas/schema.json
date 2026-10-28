@@ -1,0 +1,636 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PermissionFile",
+  "description": "Permission file that can define a default permission, a set of permissions or a list of inlined permissions.",
+  "type": "object",
+  "properties": {
+    "default": {
+      "description": "The default permission set for the plugin",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/DefaultPermission"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "set": {
+      "description": "A list of permissions sets defined",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/PermissionSet"
+      }
+    },
+    "permission": {
+      "description": "A list of inlined permissions",
+      "default": [],
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Permission"
+      }
+    }
+  },
+  "definitions": {
+    "DefaultPermission": {
+      "description": "The default permission set of the plugin.\n\nWorks similarly to a permission with the \"default\" identifier.",
+      "type": "object",
+      "required": [
+        "permissions"
+      ],
+      "properties": {
+        "version": {
+          "description": "The version of the permission.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 1.0
+        },
+        "description": {
+          "description": "Human-readable description of what the permission does. Tauri convention is to use `<h4>` headings in markdown content for Tauri documentation generation purposes.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "permissions": {
+          "description": "All permissions this set contains.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "PermissionSet": {
+      "description": "A set of direct permissions grouped together under a new name.",
+      "type": "object",
+      "required": [
+        "description",
+        "identifier",
+        "permissions"
+      ],
+      "properties": {
+        "identifier": {
+          "description": "A unique identifier for the permission.",
+          "type": "string"
+        },
+        "description": {
+          "description": "Human-readable description of what the permission does.",
+          "type": "string"
+        },
+        "permissions": {
+          "description": "All permissions this set contains.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PermissionKind"
+          }
+        }
+      }
+    },
+    "Permission": {
+      "description": "Descriptions of explicit privileges of commands.\n\nIt can enable commands to be accessible in the frontend of the application.\n\nIf the scope is defined it can be used to fine grain control the access of individual or multiple commands.",
+      "type": "object",
+      "required": [
+        "identifier"
+      ],
+      "properties": {
+        "version": {
+          "description": "The version of the permission.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 1.0
+        },
+        "identifier": {
+          "description": "A unique identifier for the permission.",
+          "type": "string"
+        },
+        "description": {
+          "description": "Human-readable description of what the permission does. Tauri internal convention is to use `<h4>` headings in markdown content for Tauri documentation generation purposes.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "commands": {
+          "description": "Allowed or denied commands when using this permission.",
+          "default": {
+            "allow": [],
+            "deny": []
+          },
+          "allOf": [
+            {
+              "$ref": "#/definitions/Commands"
+            }
+          ]
+        },
+        "scope": {
+          "description": "Allowed or denied scoped when using this permission.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Scopes"
+            }
+          ]
+        },
+        "platforms": {
+          "description": "Target platforms this permission applies. By default all platforms are affected by this permission.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/Target"
+          }
+        }
+      }
+    },
+    "Commands": {
+      "description": "Allowed and denied commands inside a permission.\n\nIf two commands clash inside of `allow` and `deny`, it should be denied by default.",
+      "type": "object",
+      "properties": {
+        "allow": {
+          "description": "Allowed command.",
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "deny": {
+          "description": "Denied command, which takes priority.",
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "Scopes": {
+      "description": "An argument for fine grained behavior control of Tauri commands.\n\nIt can be of any serde serializable type and is used to allow or prevent certain actions inside a Tauri command. The configured scope is passed to the command and will be enforced by the command implementation.\n\n## Example\n\n```json { \"allow\": [{ \"path\": \"$HOME/**\" }], \"deny\": [{ \"path\": \"$HOME/secret.txt\" }] } ```",
+      "type": "object",
+      "properties": {
+        "allow": {
+          "description": "Data that defines what is allowed by the scope.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/Value"
+          }
+        },
+        "deny": {
+          "description": "Data that defines what is denied by the scope. This should be prioritized by validation logic.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/Value"
+          }
+        }
+      }
+    },
+    "Value": {
+      "description": "All supported ACL values.",
+      "anyOf": [
+        {
+          "description": "Represents a null JSON value.",
+          "type": "null"
+        },
+        {
+          "description": "Represents a [`bool`].",
+          "type": "boolean"
+        },
+        {
+          "description": "Represents a valid ACL [`Number`].",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Number"
+            }
+          ]
+        },
+        {
+          "description": "Represents a [`String`].",
+          "type": "string"
+        },
+        {
+          "description": "Represents a list of other [`Value`]s.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Value"
+          }
+        },
+        {
+          "description": "Represents a map of [`String`] keys to [`Value`]s.",
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/Value"
+          }
+        }
+      ]
+    },
+    "Number": {
+      "description": "A valid ACL number.",
+      "anyOf": [
+        {
+          "description": "Represents an [`i64`].",
+          "type": "integer",
+          "format": "int64"
+        },
+        {
+          "description": "Represents a [`f64`].",
+          "type": "number",
+          "format": "double"
+        }
+      ]
+    },
+    "Target": {
+      "description": "Platform target.",
+      "oneOf": [
+        {
+          "description": "MacOS.",
+          "type": "string",
+          "enum": [
+            "macOS"
+          ]
+        },
+        {
+          "description": "Windows.",
+          "type": "string",
+          "enum": [
+            "windows"
+          ]
+        },
+        {
+          "description": "Linux.",
+          "type": "string",
+          "enum": [
+            "linux"
+          ]
+        },
+        {
+          "description": "Android.",
+          "type": "string",
+          "enum": [
+            "android"
+          ]
+        },
+        {
+          "description": "iOS.",
+          "type": "string",
+          "enum": [
+            "iOS"
+          ]
+        }
+      ]
+    },
+    "PermissionKind": {
+      "type": "string",
+      "oneOf": [
+        {
+          "description": "Enables the activate command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-activate",
+          "markdownDescription": "Enables the activate command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the activate command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-activate",
+          "markdownDescription": "Denies the activate command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the activate_offline command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-activate-offline",
+          "markdownDescription": "Enables the activate_offline command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the activate_offline command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-activate-offline",
+          "markdownDescription": "Denies the activate_offline command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the activate_sub_product command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-activate-sub-product",
+          "markdownDescription": "Enables the activate_sub_product command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the activate_sub_product command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-activate-sub-product",
+          "markdownDescription": "Denies the activate_sub_product command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the buy_sub_product command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-buy-sub-product",
+          "markdownDescription": "Enables the buy_sub_product command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the buy_sub_product command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-buy-sub-product",
+          "markdownDescription": "Denies the buy_sub_product command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the cancel_activation command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-cancel-activation",
+          "markdownDescription": "Enables the cancel_activation command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the cancel_activation command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-cancel-activation",
+          "markdownDescription": "Denies the cancel_activation command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the check_update command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-check-update",
+          "markdownDescription": "Enables the check_update command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the check_update command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-check-update",
+          "markdownDescription": "Denies the check_update command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the close_ui command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-close-ui",
+          "markdownDescription": "Enables the close_ui command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the close_ui command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-close-ui",
+          "markdownDescription": "Denies the close_ui command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the deactivate command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-deactivate",
+          "markdownDescription": "Enables the deactivate command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the deactivate command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-deactivate",
+          "markdownDescription": "Denies the deactivate command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the device command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-device",
+          "markdownDescription": "Enables the device command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the device command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-device",
+          "markdownDescription": "Denies the device command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the device_token command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-device-token",
+          "markdownDescription": "Enables the device_token command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the device_token command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-device-token",
+          "markdownDescription": "Denies the device_token command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the dismiss_error command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-dismiss-error",
+          "markdownDescription": "Enables the dismiss_error command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the dismiss_error command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-dismiss-error",
+          "markdownDescription": "Denies the dismiss_error command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the download_update command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-download-update",
+          "markdownDescription": "Enables the download_update command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the download_update command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-download-update",
+          "markdownDescription": "Denies the download_update command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the forget command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-forget",
+          "markdownDescription": "Enables the forget command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the forget command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-forget",
+          "markdownDescription": "Denies the forget command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the load_add_ons command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-load-add-ons",
+          "markdownDescription": "Enables the load_add_ons command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the load_add_ons command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-load-add-ons",
+          "markdownDescription": "Denies the load_add_ons command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the open_link command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-open-link",
+          "markdownDescription": "Enables the open_link command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the open_link command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-open-link",
+          "markdownDescription": "Denies the open_link command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the present command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-present",
+          "markdownDescription": "Enables the present command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the present command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-present",
+          "markdownDescription": "Denies the present command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the refresh command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-refresh",
+          "markdownDescription": "Enables the refresh command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the refresh command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-refresh",
+          "markdownDescription": "Denies the refresh command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the refresh_add_ons command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-refresh-add-ons",
+          "markdownDescription": "Enables the refresh_add_ons command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the refresh_add_ons command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-refresh-add-ons",
+          "markdownDescription": "Denies the refresh_add_ons command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the request_sub_product_trial command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-request-sub-product-trial",
+          "markdownDescription": "Enables the request_sub_product_trial command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the request_sub_product_trial command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-request-sub-product-trial",
+          "markdownDescription": "Denies the request_sub_product_trial command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the reveal_update command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-reveal-update",
+          "markdownDescription": "Enables the reveal_update command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the reveal_update command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-reveal-update",
+          "markdownDescription": "Denies the reveal_update command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the save_machine_file command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-save-machine-file",
+          "markdownDescription": "Enables the save_machine_file command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the save_machine_file command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-save-machine-file",
+          "markdownDescription": "Denies the save_machine_file command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the skip_update command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-skip-update",
+          "markdownDescription": "Enables the skip_update command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the skip_update command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-skip-update",
+          "markdownDescription": "Denies the skip_update command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the state command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-state",
+          "markdownDescription": "Enables the state command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the state command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-state",
+          "markdownDescription": "Denies the state command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the ui_ready command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-ui-ready",
+          "markdownDescription": "Enables the ui_ready command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the ui_ready command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-ui-ready",
+          "markdownDescription": "Denies the ui_ready command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the ui_resize command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-ui-resize",
+          "markdownDescription": "Enables the ui_resize command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the ui_resize command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-ui-resize",
+          "markdownDescription": "Denies the ui_resize command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the update_download_url command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-update-download-url",
+          "markdownDescription": "Enables the update_download_url command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the update_download_url command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-update-download-url",
+          "markdownDescription": "Denies the update_download_url command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the upgrade_license command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-upgrade-license",
+          "markdownDescription": "Enables the upgrade_license command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the upgrade_license command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-upgrade-license",
+          "markdownDescription": "Denies the upgrade_license command without any pre-configured scope."
+        },
+        {
+          "description": "Everything an activation UI needs: reading the license state, browser and offline\nactivation, refreshing, deactivating and forgetting the license, upgrading a\nlicense that doesn't cover this version, listing, trying, buying and activating\nadd-ons, device diagnostics, update checks and downloads, and presenting the\nbuilt-in activation window.\n\n#### This default permission set includes:\n\n- `allow-state`\n- `allow-activate`\n- `allow-cancel-activation`\n- `allow-refresh`\n- `allow-deactivate`\n- `allow-forget`\n- `allow-device-token`\n- `allow-activate-offline`\n- `allow-dismiss-error`\n- `allow-device`\n- `allow-check-update`\n- `allow-update-download-url`\n- `allow-present`\n- `allow-close-ui`\n- `allow-ui-ready`\n- `allow-ui-resize`\n- `allow-save-machine-file`\n- `allow-download-update`\n- `allow-reveal-update`\n- `allow-skip-update`\n- `allow-open-link`\n- `allow-load-add-ons`\n- `allow-refresh-add-ons`\n- `allow-activate-sub-product`\n- `allow-request-sub-product-trial`\n- `allow-buy-sub-product`\n- `allow-upgrade-license`",
+          "type": "string",
+          "const": "default",
+          "markdownDescription": "Everything an activation UI needs: reading the license state, browser and offline\nactivation, refreshing, deactivating and forgetting the license, upgrading a\nlicense that doesn't cover this version, listing, trying, buying and activating\nadd-ons, device diagnostics, update checks and downloads, and presenting the\nbuilt-in activation window.\n\n#### This default permission set includes:\n\n- `allow-state`\n- `allow-activate`\n- `allow-cancel-activation`\n- `allow-refresh`\n- `allow-deactivate`\n- `allow-forget`\n- `allow-device-token`\n- `allow-activate-offline`\n- `allow-dismiss-error`\n- `allow-device`\n- `allow-check-update`\n- `allow-update-download-url`\n- `allow-present`\n- `allow-close-ui`\n- `allow-ui-ready`\n- `allow-ui-resize`\n- `allow-save-machine-file`\n- `allow-download-update`\n- `allow-reveal-update`\n- `allow-skip-update`\n- `allow-open-link`\n- `allow-load-add-ons`\n- `allow-refresh-add-ons`\n- `allow-activate-sub-product`\n- `allow-request-sub-product-trial`\n- `allow-buy-sub-product`\n- `allow-upgrade-license`"
+        },
+        {
+          "description": "Read the license state and device diagnostics, without changing anything.\n#### This permission set includes:\n\n- `allow-state`\n- `allow-device`\n- `allow-check-update`\n- `allow-present`",
+          "type": "string",
+          "const": "read-only",
+          "markdownDescription": "Read the license state and device diagnostics, without changing anything.\n#### This permission set includes:\n\n- `allow-state`\n- `allow-device`\n- `allow-check-update`\n- `allow-present`"
+        }
+      ]
+    }
+  }
+}

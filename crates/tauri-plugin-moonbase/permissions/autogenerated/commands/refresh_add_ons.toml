@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-refresh-add-ons"
+description = "Enables the refresh_add_ons command without any pre-configured scope."
+commands.allow = ["refresh_add_ons"]
+
+[[permission]]
+identifier = "deny-refresh-add-ons"
+description = "Denies the refresh_add_ons command without any pre-configured scope."
+commands.deny = ["refresh_add_ons"]

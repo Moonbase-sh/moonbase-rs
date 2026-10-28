@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-activate-sub-product"
+description = "Enables the activate_sub_product command without any pre-configured scope."
+commands.allow = ["activate_sub_product"]
+
+[[permission]]
+identifier = "deny-activate-sub-product"
+description = "Denies the activate_sub_product command without any pre-configured scope."
+commands.deny = ["activate_sub_product"]

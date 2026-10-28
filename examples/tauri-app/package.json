@@ -1,0 +1,14 @@
+{
+  "name": "aurora",
+  "private": true,
+  "version": "1.0.0",
+  "description": "A palette generator showing Moonbase licensing in a Tauri app",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}
