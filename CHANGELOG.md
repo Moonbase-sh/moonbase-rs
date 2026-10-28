@@ -1,3 +1,10 @@
+## [0.1.2](https://github.com/Moonbase-sh/moonbase-rs/compare/v0.1.1...v0.1.2) (2026-10-28)
+
+
+### Bug Fixes
+
+* let Moonbase decide whether a customer may download a release ([#5](https://github.com/Moonbase-sh/moonbase-rs/issues/5)) ([a9c2030](https://github.com/Moonbase-sh/moonbase-rs/commit/a9c2030c5cdff1bbac222b8c718ed8d3702a97a5))
+
 ## [0.1.1](https://github.com/Moonbase-sh/moonbase-rs/compare/v0.1.0...v0.1.1) (2026-10-28)
 
 

@@ -1,6 +1,6 @@
 {
   "name": "tauri-plugin-moonbase-api",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Frontend bindings for tauri-plugin-moonbase: Moonbase license activation for Tauri apps.",
   "license": "MIT",
   "type": "module",
