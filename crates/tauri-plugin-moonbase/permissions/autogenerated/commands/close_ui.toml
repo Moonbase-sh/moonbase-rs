@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-close-ui"
+description = "Enables the close_ui command without any pre-configured scope."
+commands.allow = ["close_ui"]
+
+[[permission]]
+identifier = "deny-close-ui"
+description = "Denies the close_ui command without any pre-configured scope."
+commands.deny = ["close_ui"]

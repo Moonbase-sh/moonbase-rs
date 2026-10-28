@@ -1,0 +1,8 @@
+# LF in every checkout, Windows included. Some files must match a copy elsewhere
+# byte for byte: the conformance vectors vendored from @moonbase.sh/licensing,
+# which CI compares with the published package. And the release scripts must run
+# under bash.
+* text=auto eol=lf
+
+# DER-encoded test keys: never touched.
+*.pk8 binary

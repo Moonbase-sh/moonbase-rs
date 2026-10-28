@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-load-add-ons"
+description = "Enables the load_add_ons command without any pre-configured scope."
+commands.allow = ["load_add_ons"]
+
+[[permission]]
+identifier = "deny-load-add-ons"
+description = "Denies the load_add_ons command without any pre-configured scope."
+commands.deny = ["load_add_ons"]

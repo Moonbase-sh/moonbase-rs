@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Aurora</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script type="module" src="main.js" defer></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <img src="logo.svg" alt="" width="28" height="28" />
+        <span>Aurora</span>
+      </div>
+      <button id="license-badge" class="badge" type="button" hidden></button>
+    </header>
+
+    <main class="workspace">
+      <section class="palette" id="palette" aria-label="Palette"></section>
+      <div class="actions">
+        <p class="hint">Press <kbd>Space</kbd> to shuffle. Click a colour to lock it.</p>
+        <div class="buttons">
+          <button id="shuffle" class="button secondary" type="button">Shuffle</button>
+          <button id="export" class="button primary" type="button">
+            Export CSS <span class="pro">PRO</span>
+          </button>
+        </div>
+      </div>
+      <p id="toast" class="toast" role="status" hidden></p>
+    </main>
+  </body>
+</html>

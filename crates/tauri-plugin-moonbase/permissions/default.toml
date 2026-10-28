@@ -1,0 +1,44 @@
+"$schema" = "schemas/schema.json"
+
+[default]
+description = """
+Everything an activation UI needs: reading the license state, browser and offline
+activation, refreshing, deactivating and forgetting the license, upgrading a
+license that doesn't cover this version, listing, trying, buying and activating
+add-ons, device diagnostics, update checks and downloads, and presenting the
+built-in activation window.
+"""
+permissions = [
+  "allow-state",
+  "allow-activate",
+  "allow-cancel-activation",
+  "allow-refresh",
+  "allow-deactivate",
+  "allow-forget",
+  "allow-device-token",
+  "allow-activate-offline",
+  "allow-dismiss-error",
+  "allow-device",
+  "allow-check-update",
+  "allow-update-download-url",
+  "allow-present",
+  "allow-close-ui",
+  "allow-ui-ready",
+  "allow-ui-resize",
+  "allow-save-machine-file",
+  "allow-download-update",
+  "allow-reveal-update",
+  "allow-skip-update",
+  "allow-open-link",
+  "allow-load-add-ons",
+  "allow-refresh-add-ons",
+  "allow-activate-sub-product",
+  "allow-request-sub-product-trial",
+  "allow-buy-sub-product",
+  "allow-upgrade-license",
+]
+
+[[set]]
+identifier = "read-only"
+description = "Read the license state and device diagnostics, without changing anything."
+permissions = ["allow-state", "allow-device", "allow-check-update", "allow-present"]

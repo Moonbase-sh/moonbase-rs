@@ -1,0 +1,4 @@
+[env]
+# Tells build scripts they are building inside this repository, for setup only its
+# own tests need (see crates/tauri-plugin-moonbase/build.rs).
+MOONBASE_RS_WORKSPACE = "true"

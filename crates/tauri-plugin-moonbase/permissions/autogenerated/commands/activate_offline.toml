@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-activate-offline"
+description = "Enables the activate_offline command without any pre-configured scope."
+commands.allow = ["activate_offline"]
+
+[[permission]]
+identifier = "deny-activate-offline"
+description = "Denies the activate_offline command without any pre-configured scope."
+commands.deny = ["activate_offline"]

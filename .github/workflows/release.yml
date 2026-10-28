@@ -1,0 +1,61 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      # For crates.io's trusted publishing.
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      # Releases stay at 0.x for now (breaking changes bump the minor, see
+      # .releaserc.json). semantic-release makes a first release 1.0.0 whatever the
+      # commits say, so until there is a release tag, count on from v0.0.0 at the
+      # root commit instead. Pushed with the first release, after which this is a
+      # no-op.
+      - name: Count the first release on from 0.0.0
+        run: |
+          if [ -z "$(git tag --list 'v*')" ]; then
+            git tag v0.0.0 "$(git rev-list --max-parents=0 HEAD | tail -n 1)"
+          fi
+
+      # Once trusted publishing is set up for both crates on crates.io (see
+      # CONTRIBUTING.md), set the repository variable CRATES_IO_TRUSTED_PUBLISHING to
+      # true and this trades the workflow's identity for a short-lived token.
+      - name: Authenticate to crates.io
+        id: crates-io
+        if: vars.CRATES_IO_TRUSTED_PUBLISHING == 'true'
+        uses: rust-lang/crates-io-auth-action@v1
+
+      - name: Run semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Trusted publishing's token, else a CARGO_REGISTRY_TOKEN secret, else
+          # none: then the release is cut without publishing the crates.
+          CARGO_REGISTRY_TOKEN: ${{ steps.crates-io.outputs.token || secrets.CARGO_REGISTRY_TOKEN }}
+        run: npx semantic-release

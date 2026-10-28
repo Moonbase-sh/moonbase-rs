@@ -1,0 +1,21 @@
+name: PR Title
+
+# Pull requests are squash-merged, and their title becomes the commit
+# semantic-release reads to decide the next version, so it must be a Conventional
+# Commit: `feat: ...` for a minor release, `fix: ...` for a patch.
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate Conventional Commit PR title
+        uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

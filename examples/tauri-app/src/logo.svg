@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0d1330"/>
+      <stop offset="1" stop-color="#1b1145"/>
+    </linearGradient>
+    <linearGradient id="aurora" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#3ee8b5"/>
+      <stop offset="0.5" stop-color="#3f8cff"/>
+      <stop offset="1" stop-color="#b56cff"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.68" cy="0.3" r="0.5">
+      <stop offset="0" stop-color="#3f8cff" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#3f8cff" stop-opacity="0"/>
+    </radialGradient>
+    <mask id="crescent">
+      <rect width="1024" height="1024" fill="black"/>
+      <circle cx="660" cy="330" r="150" fill="white"/>
+      <circle cx="725" cy="285" r="132" fill="black"/>
+    </mask>
+  </defs>
+  <rect x="64" y="64" width="896" height="896" rx="200" fill="url(#sky)"/>
+  <rect x="64" y="64" width="896" height="896" rx="200" fill="url(#glow)"/>
+  <rect width="1024" height="1024" fill="#f4f1ff" mask="url(#crescent)"/>
+  <path d="M150 700 C 300 560, 450 760, 620 620 S 860 600, 874 560 L 874 760 C 700 860, 360 860, 150 790 Z" fill="url(#aurora)" opacity="0.92"/>
+  <path d="M150 790 C 360 700, 560 860, 874 720 L 874 800 C 760 880, 360 900, 150 860 Z" fill="url(#aurora)" opacity="0.45"/>
+</svg>

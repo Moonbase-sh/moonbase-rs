@@ -1,0 +1,225 @@
+:root {
+  --bg: #0b0f1f;
+  --bg-raised: #131a33;
+  --line: rgba(255, 255, 255, 0.08);
+  --text: #eef1ff;
+  --muted: #9aa3c7;
+  --faint: #6a7399;
+  --accent: #3f8cff;
+  --accent-strong: #2a6ff0;
+  --good: #3ee8b5;
+  --warn: #ffb547;
+  --bad: #ff6b81;
+  --radius: 14px;
+  color-scheme: dark;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(1200px 500px at 85% -10%, rgba(63, 140, 255, 0.16), transparent 60%),
+    radial-gradient(900px 400px at -10% 110%, rgba(62, 232, 181, 0.08), transparent 60%),
+    var(--bg);
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+kbd {
+  font: 600 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  padding: 3px 6px;
+  border-radius: 5px;
+  border: 1px solid var(--line);
+  background: var(--bg-raised);
+}
+
+/* -- App shell ------------------------------------------------------------ */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--bg-raised);
+  font-size: 13px;
+  font-weight: 550;
+}
+
+.badge::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dot, var(--faint));
+}
+
+.badge.licensed { --dot: var(--good); }
+.badge.trial { --dot: var(--warn); }
+.badge.unlicensed { --dot: var(--bad); }
+
+.workspace {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 26px;
+}
+
+.palette {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  border-radius: 20px;
+  overflow: hidden;
+  min-height: 320px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+}
+
+.swatch {
+  position: relative;
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 18px;
+  transition: background-color 380ms ease;
+  text-align: left;
+}
+
+.swatch .hex {
+  font: 650 16px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.04em;
+}
+
+.swatch .lock {
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.swatch:hover .lock,
+.swatch.locked .lock {
+  opacity: 0.85;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.hint {
+  margin: 0;
+  color: var(--muted);
+}
+
+.buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 18px;
+  border-radius: 11px;
+  border: 1px solid transparent;
+  font-weight: 600;
+  transition: transform 80ms ease, background 150ms ease, opacity 150ms ease;
+}
+
+.button:active {
+  transform: translateY(1px);
+}
+
+.button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.button.primary {
+  background: linear-gradient(180deg, var(--accent), var(--accent-strong));
+  box-shadow: 0 8px 24px rgba(63, 140, 255, 0.35);
+}
+
+.button.secondary {
+  background: var(--bg-raised);
+  border-color: var(--line);
+}
+
+.button.danger {
+  background: transparent;
+  border-color: rgba(255, 107, 129, 0.4);
+  color: var(--bad);
+}
+
+.button.block {
+  width: 100%;
+}
+
+.pro {
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
