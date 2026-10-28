@@ -9,6 +9,13 @@ framework.
 Building a Tauri app? The [plugin](tauri.md) wraps this same core in an activation
 controller your frontend drives.
 
+Two runnable examples sit beside the crate:
+
+```sh
+cargo run -p moonbase --example activation   # activate from a terminal against the demo store
+cargo run -p moonbase --example device_id    # this machine's device id, as JSON
+```
+
 ## Requirements
 
 - Rust 1.89 or newer (edition 2024)
@@ -343,8 +350,8 @@ trying again can help:
 | `NoEligibleLicense` | No seat of an add-on to give; no verdict on the license | Offer to buy the add-on or free a seat |
 | `InsufficientDeviceIdentity` | This machine has no readable hardware identity | See [device identity](device-identity.md) |
 | `Configuration` | Bad options, an unparseable key, an empty device id | Fix the setup |
-| `Storage` | Reading or writing the stored license, or its lock, failed; `io_error()` (and `source()`) is the I/O failure behind it | |
-| `OperationNotSupported` | The call can't apply to this license: revoking an offline or trial license, an add-on it can't take | |
+| `Storage` | Reading or writing the stored license, or its lock, failed; `io_error()` (and `source()`) is the I/O failure behind it. No verdict on the license | Check the path and its permissions |
+| `OperationNotSupported` | The call can't apply to this license: revoking an offline or trial license, an add-on it can't take | Keep the license |
 
 `is_license_invalid()` is true for `LicenseInvalid`, `DeviceMismatch` and
 `ReleaseNotCovered`, so a check for "refused" covers all three; the grace period relies
@@ -354,7 +361,8 @@ How each call maps what the API returns:
 
 | Call | Response | Result |
 | --- | --- | --- |
-| `request_activation` | 400 | `LicenseInvalid` with the server's reason |
+| `request_activation` | 400 (product not active, offline activations disabled, invalid product id, a rejected field) | `LicenseInvalid` with the server's reason |
+| | 404 (no such product or account) | `Api` |
 | `get_requested_activation` | 204 or 404 | `Ok(None)` |
 | | 400 | `ActivationRequestEnded` (`LicenseExpired` only for an explicit `LicenseExpired`) |
 | `validate_token_online`, `revoke_activation` | 400 | `LicenseInvalid`, or `LicenseExpired` when `errorType` is `LicenseExpired`, or `ReleaseNotCovered` when it is `ReleaseNotCovered` |

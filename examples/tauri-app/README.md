@@ -30,10 +30,10 @@ activation screen locking the main window until the app is licensed, run it with
 AURORA_PRESENTATION=overlay cargo run -p aurora
 ```
 
- The license is kept in the
-app's data directory (`~/Library/Application Support/sh.moonbase.examples.aurora/` on
-macOS); use **Deactivate this device** in the license window, or delete `license.mb`,
-to start over.
+The license is kept in the app's data directory
+(`~/Library/Application Support/sh.moonbase.examples.aurora/` on macOS); use
+**Deactivate this device** in the license window, or delete `license.mb`, to start
+over.
 
 ## What to look at
 

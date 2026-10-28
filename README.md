@@ -3,7 +3,8 @@
 License activation for desktop apps, in Rust: a core SDK crate, and a Tauri plugin
 that drops a finished, themeable activation window into a Tauri app.
 
-[![CI](https://img.shields.io/github/actions/workflow/status/Moonbase-sh/moonbase-rs/ci.yml?branch=main&label=CI&style=flat-square)](.github/workflows/ci.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/Moonbase-sh/moonbase-rs/ci.yml?branch=main&label=CI&style=flat-square)](https://github.com/Moonbase-sh/moonbase-rs/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Moonbase-sh/moonbase-rs?sort=semver&display_name=tag&label=release&style=flat-square)](https://github.com/Moonbase-sh/moonbase-rs/releases/latest)
 [![Rust 1.89+](https://img.shields.io/badge/rust-1.89%2B-orange?style=flat-square)](https://www.rust-lang.org)
 [![Tauri 2](https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app)
 [![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20iOS%20%7C%20Android-lightgrey?style=flat-square)](#pick-your-path)
@@ -37,6 +38,8 @@ the same error model and the same cross-SDK device id.
 | --- | --- | --- |
 | **Form** | Library crate, blocking API | Tauri 2 plugin |
 | **Built-in UI** | No | Yes, themeable: its own window, or an overlay that locks the app until it is licensed; or turn it off and drive your own from the state event |
+| **Requires** | Rust 1.89 | Rust 1.89, Tauri 2 |
+| **System libraries** | None: crypto is `ring`, HTTP is `ureq` with `rustls` | Only Tauri's own (the platform webview) |
 | **Best for** | CLI tools, egui/iced/Slint apps, servers of your own, anything not Tauri | Tauri apps |
 | **Guide** | [`docs/core-sdk.md`](docs/core-sdk.md) | [`docs/tauri.md`](docs/tauri.md) |
 
@@ -97,6 +100,14 @@ cargo run -p aurora
 It opens against `demo.moonbase.sh`, where you can start a trial or activate in the
 browser. See [`examples/tauri-app/`](examples/tauri-app/).
 
+<p align="center">
+  <img src="assets/activation-trial.png" width="49%"
+       alt="Trial screen: a yellow 'Trial, 11 days left' pill, a progress bar, and an included/excluded feature list.">
+  <img src="assets/activation-update.png" width="49%"
+       alt="Update available screen: 'Solstice 2.4.0 is ready', a 'What's new' card, and a Download button.">
+</p>
+<p align="center"><em>Trials and in-app updates, both built into the plugin.</em></p>
+
 ## What you get
 
 - **Browser activation.** The app asks for a request, opens a URL, and polls. No
@@ -129,11 +140,13 @@ browser. See [`examples/tauri-app/`](examples/tauri-app/).
 
 | | |
 | --- | --- |
-| [Core SDK](docs/core-sdk.md) | Activation, validation, the grace period, licenses that cover some versions, revocation, add-ons, offline licenses, errors, custom storage and transports, mapping from moonbase-cpp |
-| [Tauri plugin](docs/tauri.md) | Setup, the activation window and its theming, locking the app, the state model, commands and events, gating, add-ons, licenses that cover some versions, offline activation, updates |
+| [Core SDK](docs/core-sdk.md) | Activation, validation, the grace period, licenses that cover some versions, revocation, add-ons, errors, offline licenses, updates, custom storage and transports, mapping from moonbase-cpp |
+| [Tauri plugin](docs/tauri.md) | Setup, the activation window and its theming, locking the app, the state model, commands and events, gating, add-ons, licenses that cover some versions, updates, offline activation, diagnostics |
 | [Device identity](docs/device-identity.md) | What the device id is made of, failure modes, diagnostics |
+| [Fingerprint spec](https://github.com/Moonbase-sh/moonbase-cpp/blob/main/FINGERPRINT_SPEC.md) | The normative cross-SDK algorithm and stability contract, kept in moonbase-cpp |
 | [Security](docs/security.md) | What the SDK guarantees, what it leaves to you, and how to gate well |
-| [Contributing](CONTRIBUTING.md) | Build, test, conformance vectors, CI |
+| [Contributing](CONTRIBUTING.md) | Build, test, conformance vectors, the frontend API, CI, releases |
+| Samples | [core](crates/moonbase/examples/activation.rs), [device id](crates/moonbase/examples/device_id.rs), [Tauri](examples/tauri-app/) |
 
 ## Security
 
@@ -142,6 +155,13 @@ machine, right now? It deliberately ships no anti-debugging, obfuscation or tamp
 detection, because anything general enough to live in an open-source crate is
 identical in every app using it. Hardening belongs in your binary.
 [How to do it well](docs/security.md).
+
+## Versioning
+
+Semantic versioning, tagged `v<major>.<minor>.<patch>`, with a GitHub release per tag.
+Both crates share one version. They stay at 0.x while the API settles, so a breaking
+change bumps the minor version (0.1 to 0.2), which Cargo already treats as
+incompatible.
 
 ## License
 
