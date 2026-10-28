@@ -172,6 +172,7 @@ export interface UpdateInfo {
   latestVersion: string | null
   releaseNotes: string
   hasDownloads: boolean
+  /** Whether Moonbase lets the customer download the installer. */
   canDownload: boolean
   /** False when the customer's licenses don't cover the new version: offer `upgradeLicense()`. */
   covered: boolean

@@ -626,6 +626,23 @@ fn a_new_version_the_license_doesnt_cover_offers_the_upgrade() {
     assert_eq!(info.release_access.unwrap().up_to_major, Some(0));
 }
 
+#[test]
+fn a_new_version_moonbase_doesnt_let_the_customer_download_isnt_offered() {
+    let dir = tempfile::tempdir().unwrap();
+    store(dir.path(), &token(&claims())); // 1.2.3 is out; this is 1.0.0
+    // Limited to a group of customers this one isn't in: owning the product isn't enough.
+    let release = json!({
+        "version": "1.2.3", "releaseDescription": "- Faster", "downloadsNeedsOwnership": true,
+        "downloadsAllowed": false, "downloads": [{"name": "Demo-1.2.3.dmg", "platform": "Mac"}],
+    });
+    let app = app(dir.path(), ScriptedMoonbase::new([HttpResponse::new(200, release.to_string())]));
+    settled(&app);
+
+    let info = app.moonbase().check_update().unwrap();
+    assert!(info.available && info.has_downloads && info.covered);
+    assert!(!info.can_download);
+}
+
 // -- Add-ons ------------------------------------------------------------------------
 
 fn catalog(entries: Value) -> HttpResponse {
