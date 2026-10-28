@@ -39,6 +39,8 @@ fn get_release_parses_the_access_control_flags_and_tolerates_missing_notes() {
     )]);
     let info = client.get_release("2.4.0", "tok").unwrap();
     assert!(info.downloads_need_user && info.downloads_need_ownership);
+    // An older Moonbase doesn't say whether this customer may download it.
+    assert_eq!(info.downloads_allowed, None);
 
     let (client, transport) = inventory([ok(r#"{"id":"demo-app","name":"Solstice","currentVersion":"2.4.0"}"#)]);
     let info = client.get_release("", "tok").unwrap();
@@ -75,15 +77,47 @@ fn get_download_url_fails_retryably_when_there_is_no_installer() {
     assert!(matches!(error, Error::Api(api) if api.status_code() == 404));
 }
 
+fn license(trial: bool, user: &str) -> License {
+    let fixture = fixture([]);
+    let mut license = fixture.licensing.validate_token_local(&make_token(&claims())).unwrap();
+    license.trial = trial;
+    license.issued_to.id = user.into();
+    license
+}
+
 #[test]
-fn can_download_enforces_the_access_control_flags() {
-    let license = |trial: bool, user: &str| -> License {
-        let fixture = fixture([]);
-        let mut license = fixture.licensing.validate_token_local(&make_token(&claims())).unwrap();
-        license.trial = trial;
-        license.issued_to.id = user.into();
-        license
-    };
+fn get_release_reads_whether_moonbase_lets_the_customer_download_it() {
+    let (client, _) = inventory([
+        ok(r#"{"version":"2.4.0","downloadsNeedsUser":true,"downloadsAllowed":false,"downloads":[{}]}"#),
+        ok(r#"{"version":"2.4.0","downloadsNeedsOwnership":true,"downloadsAllowed":true,"downloads":[{}]}"#),
+    ]);
+    assert_eq!(client.get_release("2.4.0", "tok").unwrap().downloads_allowed, Some(false));
+    assert_eq!(client.get_release("2.4.0", "tok").unwrap().downloads_allowed, Some(true));
+}
+
+#[test]
+fn can_download_goes_by_moonbases_answer_when_it_has_one() {
+    let full = license(false, "user-1");
+    let trial = license(true, "user-1");
+
+    // A release limited to a group of customers: the flags alone would let an owner
+    // download it.
+    let refused =
+        ReleaseInfo { downloads_need_ownership: true, downloads_allowed: Some(false), ..ReleaseInfo::default() };
+    assert!(!can_download(&full, &refused));
+
+    // A customer on a trial here who owns the product through another license.
+    let allowed =
+        ReleaseInfo { downloads_need_ownership: true, downloads_allowed: Some(true), ..ReleaseInfo::default() };
+    assert!(can_download(&trial, &allowed));
+
+    // A release the customer's licenses don't cover stays refused.
+    let not_covered = ReleaseInfo { release_covered: false, ..allowed };
+    assert!(!can_download(&full, &not_covered));
+}
+
+#[test]
+fn can_download_falls_back_to_the_access_control_flags_without_moonbases_answer() {
     let full = license(false, "user-1");
     let trial_owned = license(true, "user-1");
     let trial_anonymous = license(true, "00000000-0000-0000-0000-000000000000");

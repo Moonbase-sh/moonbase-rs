@@ -445,6 +445,12 @@ if let Some(latest) = &license.licensed_product.current_release_version {
 }
 ```
 
+`get_release` asks for the customer the license token belongs to, and Moonbase answers
+whether they may download the release (`downloads_allowed`), by every rule it has,
+including a release limited to a group of customers. `can_download` goes by that answer.
+An older Moonbase doesn't send it, and then `can_download` works out the common rules on
+the device: owning the product, and being a signed-in customer.
+
 For a customer whose licenses cover only some versions, `get_release` says whether they
 cover this one (`release_covered`, with `release_access` and `upgrade_url`),
 `can_download` takes that into account, and `get_download_url` fails with

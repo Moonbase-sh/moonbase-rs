@@ -32,6 +32,12 @@ pub struct ReleaseInfo {
     pub downloads_need_user: bool,
     /// Downloading requires owning or subscribing to the product.
     pub downloads_need_ownership: bool,
+    /// Whether the customer the license token belongs to may download this
+    /// release, as Moonbase decides it with every rule the release has: ownership,
+    /// customer groups, and the versions their licenses cover. `None` from an older
+    /// Moonbase that doesn't say, when [`can_download`] works it out from the flags
+    /// above instead.
+    pub downloads_allowed: Option<bool>,
     /// Whether the customer's licenses cover this release. False only when
     /// Moonbase says they don't, for a license that covers only some versions;
     /// downloading it is then refused with [`Error::ReleaseNotCovered`].
@@ -50,6 +56,7 @@ impl Default for ReleaseInfo {
             has_downloads: false,
             downloads_need_user: false,
             downloads_need_ownership: false,
+            downloads_allowed: None,
             release_covered: true,
             release_access: None,
             upgrade_url: None,
@@ -70,15 +77,21 @@ pub struct DownloadTarget {
 
 const NIL_GUID: &str = "00000000-0000-0000-0000-000000000000";
 
-/// May `license` download the installer for a release with these access flags?
+/// May `license` download the installer for a release?
 ///
-/// Mirrors the backend's release access control: a full license owns the product
-/// and a trial does not; an authenticated customer has a real user id, while an
-/// anonymous trial carries the nil GUID; and an owner gets only a release their
-/// licenses cover.
+/// Moonbase says so itself ([`ReleaseInfo::downloads_allowed`]), with every rule
+/// the release has. Without that answer, from an older Moonbase, this works out
+/// the common rules as Moonbase would: a full license owns the product and a trial
+/// does not; an authenticated customer has a real user id, while an anonymous
+/// trial carries the nil GUID; and an owner gets only a release their licenses
+/// cover. A rule beyond those, such as a release limited to a group of customers,
+/// is then left to the download itself to refuse.
 pub fn can_download(license: &License, info: &ReleaseInfo) -> bool {
     if !info.release_covered {
         return false;
+    }
+    if let Some(allowed) = info.downloads_allowed {
+        return allowed;
     }
     let owns = !license.trial;
     let has_user = !license.issued_to.id.is_empty() && license.issued_to.id != NIL_GUID;
@@ -160,9 +173,10 @@ impl InventoryClient {
     ///
     /// Every failure is an [`ApiError`] with the HTTP status. These endpoints never
     /// refuse the license itself: a token they cannot use just makes the request
-    /// anonymous, so a private product then answers 404. For a customer whose
-    /// licenses don't cover every release, the result says whether they cover this
-    /// one (`release_covered`) and where to upgrade.
+    /// anonymous, so a private product then answers 404. The result says whether
+    /// Moonbase lets the customer download the release (`downloads_allowed`), and,
+    /// for a customer whose licenses don't cover every release, whether they cover
+    /// this one (`release_covered`) and where to upgrade.
     pub fn get_release(&self, version: &str, license_token: &str) -> Result<ReleaseInfo> {
         let mut query = BTreeMap::from([("includeManifests".to_owned(), "false".to_owned())]);
         if !version.is_empty() {
@@ -183,6 +197,7 @@ impl InventoryClient {
                 .is_some_and(|downloads| !downloads.is_empty()),
             downloads_need_user: flag("downloadsNeedsUser"),
             downloads_need_ownership: flag("downloadsNeedsOwnership"),
+            downloads_allowed: json.get("downloadsAllowed").and_then(Value::as_bool),
             release_covered: access
                 .and_then(|access| access.get("coversRelease"))
                 .and_then(Value::as_bool)

@@ -182,8 +182,8 @@ pub struct UpdateInfo {
     pub latest_version: Option<String>,
     pub release_notes: String,
     pub has_downloads: bool,
-    /// Whether this license may download the installer, per the product's
-    /// release access control.
+    /// Whether Moonbase lets the customer download the installer (see
+    /// [`moonbase::can_download`]).
     pub can_download: bool,
     /// False when Moonbase says the customer's licenses don't cover the new
     /// version (`can_download` is false then too): it needs an upgrade.

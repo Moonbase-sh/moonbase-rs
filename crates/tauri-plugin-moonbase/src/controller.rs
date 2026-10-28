@@ -1242,8 +1242,9 @@ impl<R: Runtime> Moonbase<R> {
         };
         if let (true, Some(latest)) = (info.available, latest) {
             let release = self.0.licensing.inventory().get_release(&latest, &license.token)?;
-            // Moonbase judges this by all of the customer's licenses, as validating
-            // the new version does: the seat moves to one that covers it.
+            // Moonbase judges this by every rule the release has, and by all of the
+            // customer's licenses, as validating the new version does: the seat
+            // moves to one that covers it.
             info.can_download = release.has_downloads && can_download(&license, &release);
             info.has_downloads = release.has_downloads;
             info.release_notes = release.description;

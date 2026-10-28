@@ -413,14 +413,16 @@ at startup (`auto_present_update`), unless the customer skipped that version, an
 license details get an "Update" pill that opens it again. The screen loads the release
 notes, and Download saves the installer for this platform into Downloads, with
 progress, and reveals it. "Skip this version" is remembered in `<license>.state.json`
-beside the license, so only a newer release prompts again. For a new version the
-customer's licenses don't cover, the screen offers the upgrade instead.
+beside the license, so only a newer release prompts again. Download is offered only when
+Moonbase says the customer may download the release. For a new version the customer's
+licenses don't cover, the screen offers the upgrade instead, and to a trial that may
+not download it, the full version.
 
 In a UI of your own:
 
 ```js
 if (state.update) {
-  const info = await moonbase.checkUpdate() // the notes, and whether the license covers it
+  const info = await moonbase.checkUpdate() // the notes, and whether the customer may download it
   if (info.canDownload) {
     const { url, filename } = await moonbase.updateDownloadUrl() // presigned, short-lived
   } else if (!info.covered) {

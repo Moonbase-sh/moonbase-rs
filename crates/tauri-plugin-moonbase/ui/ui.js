@@ -664,6 +664,10 @@ function createActivationUI({ root, config, invoke, mode, onHeight }) {
       // Moonbase says the customer's licenses don't cover the new version, when the
       // notes load or when the download is refused: offer the upgrade instead.
       const notCovered = update.covered === false || download.phase === 'notCovered'
+      // A trial that may not download it is offered the full version. Anyone else
+      // Moonbase doesn't let download it, such as a customer outside the group a
+      // release is limited to, is just told so.
+      const unlock = !update.canDownload && !notCovered && !!state.license?.trial
       const access = download.releaseAccess || update.releaseAccess
       const upgradeUrl = download.upgradeUrl || update.upgradeUrl
       return h(
@@ -679,7 +683,13 @@ function createActivationUI({ root, config, invoke, mode, onHeight }) {
           h('span', { class: 'mono em' }, update.currentVersion || 'an earlier version'),
           '. The latest is ',
           h('span', { class: 'mono', style: 'color:#82cef1' }, update.latestVersion),
-          update.canDownload && !notCovered ? ', included in your license.' : notCovered ? ", which your license doesn't cover." : ", which your license doesn't include yet.",
+          update.canDownload && !notCovered
+            ? ', included in your license.'
+            : notCovered
+              ? ", which your license doesn't cover."
+              : unlock
+                ? ", which your license doesn't include yet."
+                : ", which isn't available for you to download.",
         ),
         notes.length > 0 &&
           h(
@@ -698,7 +708,7 @@ function createActivationUI({ root, config, invoke, mode, onHeight }) {
                 iconPath: downloading ? null : paths.download,
                 disabled: downloading,
               })
-            : button('Unlock full version', () => run(() => invoke('activate', { offline: false })), { iconPath: paths.lock }),
+            : unlock && button('Unlock full version', () => run(() => invoke('activate', { offline: false })), { iconPath: paths.lock }),
         download.phase === 'done' && h('p', { style: 'margin-top:12px; text-align:center; font-size:12.5px' }, `Saved to ${download.path}`),
         notCovered && h('p', { class: 'fine-print' }, [`Version ${update.latestVersion} needs an upgrade.`, releaseAccessText(access)].filter(Boolean).join(' ')),
         errorLine(download.phase === 'failed' ? download.error : null),
