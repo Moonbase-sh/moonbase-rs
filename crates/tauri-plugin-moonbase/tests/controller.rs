@@ -279,17 +279,81 @@ fn a_trial_is_forgotten_locally_rather_than_revoked() {
     assert!(!dir.path().join("license.mb").exists());
 }
 
+const LICENSE_EXPIRED: &str = r#"{"errorType":"LicenseExpired","detail":"The license has expired"}"#;
+
 #[test]
 fn an_ended_trial_shows_as_expired_at_startup() {
-    let dir = tempfile::tempdir().unwrap();
-    store(dir.path(), &token(&with(with(claims(), "trial", json!(true)), "exp", json!(now() - 60))));
-    let app = app(dir.path(), ScriptedMoonbase::new([]));
+    // Whether Moonbase says so or can't be asked.
+    for answer in [Some(HttpResponse::new(400, LICENSE_EXPIRED)), None] {
+        let dir = tempfile::tempdir().unwrap();
+        store(dir.path(), &token(&with(with(claims(), "trial", json!(true)), "exp", json!(now() - 60))));
+        let moonbase = ScriptedMoonbase::new(answer);
+        let app = app(dir.path(), moonbase.clone());
 
-    let state = settled(&app);
-    assert_eq!(state.status, Status::TrialExpired);
-    assert_eq!(state.lock_reason, Some(LockReason::Expired));
-    assert_eq!(state.expired_trial.unwrap().days_remaining, Some(0));
-    assert!(!state.licensed);
+        let state = settled(&app);
+        assert_eq!(state.status, Status::TrialExpired);
+        assert_eq!(state.lock_reason, Some(LockReason::Expired));
+        assert_eq!(state.expired_trial.unwrap().days_remaining, Some(0));
+        assert!(!state.licensed);
+        assert_eq!(moonbase.sent().len(), 1);
+    }
+}
+
+#[test]
+fn an_expired_license_is_checked_online_at_startup_before_it_locks() {
+    // A subscription that renewed, and a trial that was extended, while the app
+    // was closed: only Moonbase knows.
+    for trial in [false, true] {
+        let dir = tempfile::tempdir().unwrap();
+        let lapsed = with(with(claims(), "exp", json!(now() - 86_400)), "validated", json!(now() - 3 * 86_400));
+        store(dir.path(), &token(&with(lapsed, "trial", json!(trial))));
+        let renewed = token(&with(claims(), "trial", json!(trial)));
+        let moonbase = ScriptedMoonbase::new([HttpResponse::new(200, renewed.clone())]);
+        let app = app(dir.path(), moonbase.clone());
+
+        let state = settled(&app);
+        assert_eq!(state.status, if trial { Status::Trial } else { Status::Licensed });
+        assert_eq!(state.lock_reason, None);
+        assert_eq!(state.license.unwrap().days_remaining, Some(30));
+        assert!(moonbase.sent()[0].contains("/api/client/licenses/demo-app/validate"));
+        assert_eq!(stored_token(dir.path()), renewed);
+    }
+}
+
+#[test]
+fn an_expired_license_locks_when_moonbase_confirms_it_or_cant_be_asked() {
+    for answer in [Some(HttpResponse::new(400, LICENSE_EXPIRED)), Some(HttpResponse::new(503, "")), None] {
+        let dir = tempfile::tempdir().unwrap();
+        store(dir.path(), &token(&with(claims(), "exp", json!(now() - 60))));
+        let moonbase = ScriptedMoonbase::new(answer);
+        let app = app(dir.path(), moonbase.clone());
+
+        let state = settled(&app);
+        assert_eq!(state.status, Status::Unlicensed);
+        assert_eq!(state.lock_reason, Some(LockReason::Expired));
+        assert_eq!(moonbase.sent().len(), 1);
+        // Kept, as a license refused at startup is: the app decides.
+        assert!(dir.path().join("license.mb").exists());
+    }
+}
+
+#[test]
+fn a_license_that_expires_while_the_app_runs_is_checked_online_before_it_locks() {
+    let dir = tempfile::tempdir().unwrap();
+    // Validated moments ago, so startup asks nothing, and out in two seconds.
+    store(dir.path(), &token(&with(claims(), "exp", json!(now() + 2))));
+    let renewed = token(&claims());
+    let moonbase = ScriptedMoonbase::new([HttpResponse::new(200, renewed.clone())]);
+    let app = app(dir.path(), moonbase.clone());
+    assert_eq!(settled(&app).status, Status::Licensed);
+    assert!(moonbase.sent().is_empty());
+
+    let state = wait_for(&app, "the renewal", |state| {
+        state.license.as_ref().is_some_and(|license| license.days_remaining == Some(30))
+    });
+    assert_eq!(state.status, Status::Licensed);
+    assert_eq!(moonbase.sent().len(), 1);
+    assert_eq!(stored_token(dir.path()), renewed);
 }
 
 #[test]
@@ -384,6 +448,21 @@ fn an_unusable_lock_file_reads_like_being_offline() {
     let state = settled(&app);
     assert_eq!(state.status, Status::Licensed);
     assert_eq!(state.lock_reason, None);
+}
+
+#[test]
+fn an_unusable_lock_file_leaves_an_expiry_standing() {
+    let dir = tempfile::tempdir().unwrap();
+    // Moonbase can't be asked without the lock, and only it could lift the expiry.
+    store(dir.path(), &token(&with(claims(), "exp", json!(now() - 60))));
+    std::fs::create_dir(dir.path().join("license.mb.lock")).unwrap();
+    let moonbase = ScriptedMoonbase::new([]);
+    let app = app(dir.path(), moonbase.clone());
+
+    let state = settled(&app);
+    assert_eq!(state.status, Status::Unlicensed);
+    assert_eq!(state.lock_reason, Some(LockReason::Expired));
+    assert!(moonbase.sent().is_empty());
 }
 
 // -- Licenses that cover only some versions -----------------------------------------

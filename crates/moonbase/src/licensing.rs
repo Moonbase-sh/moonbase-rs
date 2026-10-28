@@ -12,7 +12,7 @@ use crate::sub_product::SubProductCatalog;
 use crate::time::age;
 use crate::types::{ActivationMethod, ActivationRequest, License, LicensingOptions};
 use crate::url::trim_trailing_slashes;
-use crate::validator::LicenseValidator;
+use crate::validator::{LicenseValidator, license_expired};
 
 /// The SDK's entry point: activation, validation, offline licenses, revocation,
 /// add-ons and storage, for one product.
@@ -211,7 +211,10 @@ impl Licensing {
     /// The stored license, validated as
     /// [`validate_token_online`](Self::validate_token_online) validates one: on the
     /// device, and online when it is due, storing the refreshed copy. `Ok(None)`
-    /// when nothing is stored. What to do at startup.
+    /// when nothing is stored. What to do at startup. A stored online license that
+    /// has expired is checked with Moonbase before it fails with
+    /// [`Error::LicenseExpired`], so a subscription renewed while the app was
+    /// closed carries on.
     ///
     /// The stored license stays where it is whatever the answer, so the app
     /// decides what a refusal means:
@@ -334,6 +337,11 @@ impl Licensing {
     ///   store) falls back to the local result while the license is within
     ///   `online_validation_grace_period`, and propagates beyond it.
     /// - A verdict ([`Error::is_license_rejection`]) always propagates.
+    /// - An online license whose `exp` has passed is checked whatever the
+    ///   throttle, as a subscription may have renewed, or a trial been extended or
+    ///   bought, since the token was issued. It fails with
+    ///   [`Error::LicenseExpired`] unless Moonbase answers with a license that
+    ///   hasn't: no answer leaves the expiry standing, grace period or not.
     /// - Offline-activated licenses never contact the API.
     /// - A license that doesn't cover `application_version` fails with
     ///   [`Error::ReleaseNotCovered`]. Moonbase judges that for an online license,
@@ -356,8 +364,15 @@ impl Licensing {
     /// refreshed license, e.g. when the user pressed "Deactivate" while this
     /// re-validation was in flight.
     pub fn validate_token_online_with(&self, token: &str, should_persist: impl Fn() -> bool) -> Result<License> {
-        let local = self.validator.validate_token_ignoring_release_access(token)?;
+        // Everything but the expiry, which only Moonbase can settle for an online
+        // license: a subscription renews, and a trial is extended or bought, after
+        // the token was issued. Moonbase reads a token whatever its `exp`.
+        let local = self.validator.validate_token_allow_expired(token)?;
         if local.method == ActivationMethod::Offline {
+            // Never checked online, so its `exp` is final.
+            if local.is_expired() {
+                return Err(license_expired());
+            }
             self.validator.ensure_covers_application_version(&local)?;
             return Ok(local);
         }
@@ -366,7 +381,9 @@ impl Licensing {
         // across processes, and a reload under the lock so a waiter sees the fresh
         // validated_at the previous holder wrote and short-circuits on it.
         let _in_process = self.validate_mutex.lock().unwrap_or_else(PoisonError::into_inner);
-        let _cross_process = self.store.lock_for_update()?;
+        // Without the lock Moonbase isn't asked, so an expiry stands.
+        let _cross_process =
+            self.store.lock_for_update().map_err(|error| if local.is_expired() { license_expired() } else { error })?;
 
         let mut freshest = local;
         // Two copies validated at the same time can still differ: an add-on call
@@ -396,9 +413,15 @@ impl Licensing {
 
         let age = age(freshest.validated_at);
         let grace = self.options.online_validation_grace_period;
+        // Judged here rather than on entry: the caller's copy may have run out
+        // while a sibling stored a renewed one, or run out while this waited its
+        // turn.
+        let expired = freshest.is_expired();
         // The throttle may only skip the API inside the grace period too, or a
-        // min_interval longer than the grace period would silently extend it.
-        if !undecided && age < self.options.online_validation_min_interval && age <= grace {
+        // min_interval longer than the grace period would silently extend it. A
+        // copy that has expired can't answer for the license, however recently it
+        // was checked.
+        if !undecided && !expired && age < self.options.online_validation_min_interval && age <= grace {
             self.validator.ensure_covers_application_version(&freshest)?;
             return Ok(freshest);
         }
@@ -422,6 +445,9 @@ impl Licensing {
                 Err(Error::ReleaseNotCovered(refusal))
             }
             Err(error) if error.is_license_rejection() => Err(error),
+            // No answer, so the expiry stands: the grace period rides out an
+            // outage, never an expiry. A closed store included, as below.
+            Err(_) if expired => Err(license_expired()),
             // A closed store included: it is not signed, so it relaxes nothing.
             Err(_) if age <= grace => {
                 self.validator.ensure_covers_application_version(&freshest)?;

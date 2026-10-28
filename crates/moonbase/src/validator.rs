@@ -19,6 +19,11 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::LicenseInvalid(message.into())
 }
 
+/// What the device says of a license whose `exp` has passed.
+pub(crate) fn license_expired() -> Error {
+    Error::LicenseExpired("License has expired".into())
+}
+
 pub(crate) fn split_jwt(token: &str) -> Result<[&str; 3]> {
     let mut parts = token.split('.');
     match (parts.next(), parts.next(), parts.next(), parts.next()) {
@@ -380,7 +385,7 @@ impl LicenseValidator {
         };
 
         if !allow_expired && license.is_expired() {
-            return Err(Error::LicenseExpired("License has expired".into()));
+            return Err(license_expired());
         }
 
         let expected = self.device_ids.device_id()?;
