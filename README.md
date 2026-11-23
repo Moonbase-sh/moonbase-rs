@@ -52,7 +52,7 @@ so a license activated through any of them validates in the others.
 
 ```toml
 [dependencies]
-moonbase = "0.1"
+moonbase = "0.2"
 ```
 
 ```rust

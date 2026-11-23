@@ -1,3 +1,10 @@
+# [0.2.0](https://github.com/Moonbase-sh/moonbase-rs/compare/v0.1.2...v0.2.0) (2026-11-23)
+
+
+### Features
+
+* read the revocable claim and hide Deactivate for non-revocable licenses ([#6](https://github.com/Moonbase-sh/moonbase-rs/issues/6)) ([7f17048](https://github.com/Moonbase-sh/moonbase-rs/commit/7f1704899e62c81c841329474a1db74bfe3f4d4c))
+
 ## [0.1.2](https://github.com/Moonbase-sh/moonbase-rs/compare/v0.1.1...v0.1.2) (2026-10-28)
 
 

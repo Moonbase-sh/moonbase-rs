@@ -21,7 +21,7 @@ state event and commands.
 ```toml
 # src-tauri/Cargo.toml
 [dependencies]
-tauri-plugin-moonbase = "0.1"
+tauri-plugin-moonbase = "0.2"
 tauri-plugin-opener = "2"
 ```
 

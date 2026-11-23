@@ -28,7 +28,7 @@ cargo run -p moonbase --example device_id    # this machine's device id, as JSON
 
 ```toml
 [dependencies]
-moonbase = "0.1"
+moonbase = "0.2"
 ```
 
 | Feature | Default | Purpose |
