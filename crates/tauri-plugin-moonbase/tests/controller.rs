@@ -174,6 +174,8 @@ fn the_frontends_license_is_the_sdks_without_the_token() {
     let mut expected = serde_json::to_value(app.moonbase().license().unwrap()).unwrap();
     expected.as_object_mut().unwrap().remove("token");
     expected["daysRemaining"] = json!(30);
+    // Decided for the UI, where the license file has only the claim, if any.
+    expected["revocable"] = json!(true);
     assert_eq!(view, expected);
 }
 
@@ -277,6 +279,108 @@ fn a_trial_is_forgotten_locally_rather_than_revoked() {
     assert_eq!(state.lock_reason, Some(LockReason::Deactivated));
     assert!(moonbase.sent().is_empty());
     assert!(!dir.path().join("license.mb").exists());
+}
+
+const NOT_REVOCABLE: &str = r#"{"title":"Not allowed","status":403,"detail":"Activations of this product can only be revoked by the seller","errorType":"LicenseNotRevocable"}"#;
+
+fn refused_as_not_revocable(result: tauri_plugin_moonbase::Result<LicenseState>) -> bool {
+    matches!(result, Err(tauri_plugin_moonbase::Error::Moonbase(moonbase::Error::LicenseNotRevocable(_))))
+}
+
+#[test]
+fn a_license_the_customer_may_not_revoke_is_kept_without_asking_moonbase() {
+    let dir = tempfile::tempdir().unwrap();
+    store(dir.path(), &token(&with(claims(), "revocable", json!(false))));
+    let moonbase = ScriptedMoonbase::new([]);
+    let app = app(dir.path(), moonbase.clone());
+    assert!(!settled(&app).license.unwrap().revocable);
+
+    assert!(refused_as_not_revocable(app.moonbase().deactivate()));
+    let state = app.moonbase().state();
+    assert_eq!(state.status, Status::Licensed);
+    assert!(!state.busy);
+    let error = state.error.unwrap();
+    assert_eq!(
+        error.message,
+        "Only the developer can deactivate this computer. Contact them to move your license to another one."
+    );
+    assert_eq!(error.kind, Some(moonbase::ErrorType::LicenseNotRevocable));
+    assert!(moonbase.sent().is_empty());
+    assert!(dir.path().join("license.mb").exists());
+}
+
+#[test]
+fn a_refusal_from_moonbase_keeps_the_license_and_picks_up_that_it_is_not_revocable() {
+    let dir = tempfile::tempdir().unwrap();
+    // Issued before the seller stopped customers revoking, so it says nothing.
+    store(dir.path(), &token(&claims()));
+    let moonbase = ScriptedMoonbase::new([
+        HttpResponse::new(403, NOT_REVOCABLE),
+        HttpResponse::new(200, token(&with(claims(), "revocable", json!(false)))),
+    ]);
+    let app = app(dir.path(), moonbase.clone());
+    assert!(settled(&app).license.unwrap().revocable);
+
+    assert!(refused_as_not_revocable(app.moonbase().deactivate()));
+    let sent = moonbase.sent();
+    assert!(sent[0].contains("/api/client/licenses/demo-app/revoke"));
+    assert!(sent[1].contains("/api/client/licenses/demo-app/validate"));
+    let state = app.moonbase().state();
+    assert_eq!(state.status, Status::Licensed);
+    assert!(!state.license.unwrap().revocable, "the window stops offering to deactivate");
+    assert_eq!(state.error.unwrap().kind, Some(moonbase::ErrorType::LicenseNotRevocable));
+    let stored = FileLicenseStore::new(dir.path().join("license.mb")).load_local_license().unwrap().unwrap();
+    assert_eq!(stored.revocable, Some(false));
+}
+
+#[test]
+fn a_refusal_stands_until_moonbase_answers_with_a_newer_license() {
+    let dir = tempfile::tempdir().unwrap();
+    store(dir.path(), &token(&claims()));
+    let moonbase = ScriptedMoonbase::new([
+        HttpResponse::new(403, NOT_REVOCABLE),
+        // The re-check after the refusal gets no answer.
+        HttpResponse::new(503, ""),
+        // A later one does: the seller has let customers revoke again.
+        HttpResponse::new(200, token(&with(claims(), "revocable", json!(true)))),
+    ]);
+    let app = app(dir.path(), moonbase.clone());
+    settled(&app);
+
+    assert!(refused_as_not_revocable(app.moonbase().deactivate()));
+    assert_eq!(moonbase.sent().len(), 2, "the revoke, and the re-check");
+    let state = app.moonbase().state();
+    assert_eq!(state.status, Status::Licensed);
+    assert!(!state.license.unwrap().revocable, "the window stops offering to deactivate");
+    assert_eq!(state.error.unwrap().kind, Some(moonbase::ErrorType::LicenseNotRevocable));
+    // The license held still says it may be revoked, but Moonbase has answered for it.
+    assert!(app.moonbase().license().unwrap().is_revocable());
+
+    // Asked again, it answers the same without asking Moonbase.
+    assert!(refused_as_not_revocable(app.moonbase().deactivate()));
+    assert_eq!(moonbase.sent().len(), 2);
+    assert!(!app.moonbase().state().license.unwrap().revocable);
+
+    // A newer copy of the license decides for itself.
+    let state = app.moonbase().refresh(true).unwrap();
+    assert!(state.license.unwrap().revocable);
+    assert!(dir.path().join("license.mb").exists());
+}
+
+#[test]
+fn trials_and_offline_licenses_are_still_removed_whatever_the_claim() {
+    for claims in [with(claims(), "trial", json!(true)), with(claims(), "method", json!("Offline"))] {
+        let dir = tempfile::tempdir().unwrap();
+        store(dir.path(), &token(&with(claims, "revocable", json!(false))));
+        let moonbase = ScriptedMoonbase::new([]);
+        let app = app(dir.path(), moonbase.clone());
+        assert!(!settled(&app).license.unwrap().revocable);
+
+        let state = app.moonbase().deactivate().unwrap();
+        assert_eq!(state.lock_reason, Some(LockReason::Deactivated));
+        assert!(moonbase.sent().is_empty());
+        assert!(!dir.path().join("license.mb").exists());
+    }
 }
 
 const LICENSE_EXPIRED: &str = r#"{"errorType":"LicenseExpired","detail":"The license has expired"}"#;

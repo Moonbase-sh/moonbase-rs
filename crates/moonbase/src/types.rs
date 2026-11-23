@@ -177,6 +177,11 @@ pub struct License {
     /// [`covers_version`](Self::covers_version).
     #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "lenient_release_access")]
     pub release_access: Option<ReleaseAccess>,
+    /// The token's `revocable` claim: whether Moonbase lets the customer revoke this
+    /// device's activation, or `None` when the token doesn't carry it. To decide
+    /// whether to offer "Deactivate", use [`is_revocable`](Self::is_revocable).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub revocable: Option<bool>,
     /// The license's custom properties (the trial's, for a trial).
     #[serde(default = "empty_object")]
     pub properties: Value,
@@ -188,6 +193,25 @@ impl License {
     /// Has `expires_at` passed?
     pub fn is_expired(&self) -> bool {
         self.expires_at.is_some_and(|expires| expires < SystemTime::now())
+    }
+
+    /// Whether the customer may revoke this device's activation, freeing its seat,
+    /// with [`Licensing::revoke_activation`](crate::Licensing::revoke_activation).
+    /// Offer "Deactivate" only when this is true.
+    ///
+    /// Never true for an offline activation or a trial. For an online license, the
+    /// token's [`revocable`](Self::revocable) claim decides: it is false for every
+    /// activation of a product whose seller frees seats themselves.
+    ///
+    /// ```
+    /// # fn details(license: &moonbase::License) {
+    /// if license.is_revocable() {
+    ///     // show "Deactivate this device"
+    /// }
+    /// # }
+    /// ```
+    pub fn is_revocable(&self) -> bool {
+        self.method == ActivationMethod::Online && !self.trial && self.revocable != Some(false)
     }
 
     /// Does the customer own this sub-product? Ownership only, included in the

@@ -537,12 +537,59 @@ fn allow_expired_surfaces_an_expired_offline_license_instead_of_failing() {
 fn revoke_refuses_offline_and_trial_tokens_without_contacting_the_api() {
     let f = fixture([]);
     for claims in [with(claims(), "method", json!("Offline")), with(claims(), "trial", json!(true))] {
-        assert!(matches!(
-            f.licensing.revoke_activation(&make_token(&claims)).unwrap_err(),
-            Error::OperationNotSupported(_)
-        ));
+        // Whatever the claim says: these were never revocable.
+        for claims in [claims.clone(), with(claims, "revocable", json!(false))] {
+            assert!(matches!(
+                f.licensing.revoke_activation(&make_token(&claims)).unwrap_err(),
+                Error::OperationNotSupported(_)
+            ));
+        }
     }
     assert_eq!(f.transport.request_count(), 0);
+}
+
+#[test]
+fn revoke_refuses_a_license_the_customer_may_not_revoke_and_keeps_it() {
+    let f = fixture([]);
+    let token = make_token(&with(claims(), "revocable", json!(false)));
+    f.store.store_local_license(&f.licensing.validate_token_local(&token).unwrap()).unwrap();
+
+    let error = f.licensing.revoke_activation(&token).unwrap_err();
+    assert!(
+        matches!(&error, Error::LicenseNotRevocable(message) if message == "Only the seller can revoke this activation")
+    );
+    assert!(!error.is_license_rejection());
+    assert_eq!(f.transport.request_count(), 0);
+    assert_eq!(f.store.load_local_license().unwrap().unwrap().token, token);
+}
+
+#[test]
+fn a_refusal_from_moonbase_keeps_the_license_too() {
+    // The token is a validation behind the seller's setting, so it still says the
+    // activation may be revoked.
+    let f = fixture([HttpResponse::new(403, NOT_REVOCABLE)]);
+    let token = make_token(&claims());
+    f.store.store_local_license(&f.licensing.validate_token_local(&token).unwrap()).unwrap();
+
+    let error = f.licensing.revoke_activation(&token).unwrap_err();
+    assert!(matches!(
+        &error,
+        Error::LicenseNotRevocable(message) if message == "Activations of this product can only be revoked by the seller"
+    ));
+    assert!(!error.is_license_rejection());
+    assert_eq!(f.transport.request_count(), 1);
+    assert_eq!(f.store.load_local_license().unwrap().unwrap().token, token);
+}
+
+#[test]
+fn revoke_calls_the_api_for_a_license_that_says_it_is_revocable() {
+    let f = fixture([ok("")]);
+    let token = make_token(&with(claims(), "revocable", json!(true)));
+    f.store.store_local_license(&f.licensing.validate_token_local(&token).unwrap()).unwrap();
+
+    f.licensing.revoke_activation(&token).unwrap();
+    assert!(f.transport.requests()[0].url.contains("/api/client/licenses/demo-app/revoke"));
+    assert!(f.store.load_local_license().unwrap().is_none());
 }
 
 #[test]

@@ -76,6 +76,18 @@ fn require_boolish(payload: &Value, key: &str) -> Result<bool> {
     }
 }
 
+/// A boolean claim, spelled as [`require_boolish`] accepts one, or `None` when it is
+/// missing. Anything else also reads as `None` instead of failing the license, since
+/// a later release may change the claim's shape.
+fn lenient_boolish(payload: &Value, key: &str) -> Option<bool> {
+    match payload.get(key)? {
+        Value::Bool(value) => Some(*value),
+        Value::String(text) if text == "true" || text == "True" => Some(true),
+        Value::String(text) if text == "false" || text == "False" => Some(false),
+        _ => None,
+    }
+}
+
 fn require_integer(payload: &Value, key: &str) -> Result<i64> {
     payload
         .get(key)
@@ -380,6 +392,9 @@ impl LicenseValidator {
             seat_count,
             seats_used,
             release_access: read_release_access(&payload),
+            // Read leniently, like the release claims: Moonbase refuses a revoke it
+            // doesn't allow anyway.
+            revocable: lenient_boolish(&payload, "revocable"),
             properties,
             token: token.to_owned(),
         };

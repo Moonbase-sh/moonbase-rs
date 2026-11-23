@@ -21,6 +21,7 @@ export type ErrorType =
   | 'storeClosed'
   | 'noEligibleLicense'
   | 'releaseNotCovered'
+  | 'licenseNotRevocable'
 
 /** How a rejected command fails. */
 export interface MoonbaseError {
@@ -68,6 +69,12 @@ export interface License {
   seatsUsed?: number
   /** Present only for a license that covers some versions of the app. */
   releaseAccess?: ReleaseAccess
+  /**
+   * Whether the customer may deactivate this device, freeing its seat. Offer `deactivate()` for an online license
+   * only when this is true. Also false once Moonbase has refused to revoke this copy of the license, until a newer one
+   * arrives. Always false for a trial or an offline license, which `deactivate()` removes from the device.
+   */
+  revocable: boolean
   properties: Record<string, unknown>
   /** Whole days until `expiresAt`, rounded up; null when the license never expires. */
   daysRemaining: number | null
@@ -186,6 +193,10 @@ export declare function activate(options?: { offline?: boolean }): Promise<Licen
 export declare function cancelActivation(): Promise<LicenseState>
 /** Re-check the license online. `force` (default true) skips the throttle. */
 export declare function refresh(options?: { force?: boolean }): Promise<LicenseState>
+/**
+ * Free this device's seat and lock; a trial or offline license is removed from the device instead. Rejects with
+ * `licenseNotRevocable`, keeping the license, when the customer may not revoke it.
+ */
 export declare function deactivate(): Promise<LicenseState>
 export declare function forget(): Promise<LicenseState>
 /** The machine file for offline activation, to save as a `.dt` file. */

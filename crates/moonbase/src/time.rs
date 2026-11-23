@@ -149,9 +149,9 @@ pub(crate) fn parse_iso8601_utc(value: &str) -> Result<SystemTime, InvalidTimest
     Ok(from_epoch_seconds(seconds))
 }
 
-/// A time in one of the API's JSON answers, where .NET writes it with a `Z`, with
-/// an offset, or with neither for a time it holds without a kind. The API keeps
-/// every time in UTC, so one without a zone is read as UTC. License tokens never
+/// A time in one of the API's JSON answers, written with a `Z`, with an offset, or
+/// with neither. The API keeps every time in UTC, so one without a zone is read as
+/// UTC. License tokens never
 /// take this path: their times are epoch seconds.
 pub(crate) fn parse_api_timestamp(value: &str) -> Result<SystemTime, InvalidTimestamp> {
     // Date, time and any fraction run up to the zone designator.

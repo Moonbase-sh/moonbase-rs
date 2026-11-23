@@ -64,6 +64,7 @@ fn sample_license() -> License {
             up_to_major: None,
             up_to_version: Some("2.3.0".into()),
         }),
+        revocable: Some(false),
         properties: json!({"seats": 3, "features": ["export"]}),
         token: "header.payload.signature".into(),
     }
@@ -121,6 +122,7 @@ fn the_file_store_round_trips_in_the_cpp_format() {
     assert_eq!(written["product"]["currentReleaseVersion"], "1.2.3");
     assert_eq!(written["issuedTo"]["email"], "jane@example.com");
     assert_eq!(written["seatCount"], 3);
+    assert_eq!(written["revocable"], false);
 
     store.delete_local_license().unwrap();
     assert!(!path.exists());
@@ -143,7 +145,22 @@ fn the_file_store_reads_a_license_without_optional_fields() {
     assert_eq!(license.method, ActivationMethod::Offline);
     assert!(license.expires_at.is_none());
     assert!(license.seat_count.is_none());
+    // A file from before Moonbase sent the claim, and the SDKs stored it.
+    assert!(license.revocable.is_none());
     assert_eq!(license.properties, json!({}));
+}
+
+#[test]
+fn the_file_store_leaves_out_a_revocable_claim_the_token_did_not_carry() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("license.mb");
+    let store = FileLicenseStore::new(&path);
+    let license = License { revocable: None, ..sample_license() };
+    store.store_local_license(&license).unwrap();
+
+    let written: serde_json::Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+    assert!(written.get("revocable").is_none());
+    assert_eq!(store.load_local_license().unwrap(), Some(license));
 }
 
 #[test]

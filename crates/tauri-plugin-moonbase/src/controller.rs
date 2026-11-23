@@ -92,6 +92,17 @@ impl NotCoveredLicense {
     }
 }
 
+/// Moonbase's refusal to revoke a license that said it could be revoked: its token
+/// was older than the seller's setting. That copy of the license counts as not
+/// revocable from then on, even when re-checking it fails, so the window doesn't
+/// keep offering a deactivation Moonbase will refuse. A newer copy, from any
+/// successful validation, decides for itself.
+#[derive(Debug, Clone)]
+struct RefusedRevocation {
+    token: String,
+    message: String,
+}
+
 /// Where this device stands with its license: one of these at a time, so no two
 /// can contradict each other.
 #[derive(Debug, Clone)]
@@ -157,6 +168,9 @@ struct Inner {
     pending: Option<ActivationRequest>,
     /// The generation of the deactivation in flight, so only that one clears it.
     deactivating: Option<u64>,
+    /// The copy of the license Moonbase refused to revoke, as one only the seller
+    /// may revoke. See [`RefusedRevocation`].
+    refused_revocation: Option<RefusedRevocation>,
     error: Option<Failure>,
     refreshes_in_flight: usize,
     last_grace_check: Option<Instant>,
@@ -263,6 +277,9 @@ fn failure(activity: Activity, error: &SdkError) -> Failure {
             "Activation was rejected. If this keeps happening, contact the developer.".into()
         }
 
+        (Activity::Deactivation, SdkError::LicenseNotRevocable(_)) => {
+            "Only the developer can deactivate this computer. Contact them to move your license to another one.".into()
+        }
         (Activity::Deactivation, SdkError::Api(api)) if busy_status(api.status_code()) => {
             "Moonbase couldn't deactivate right now. Try again in a minute.".into()
         }
@@ -539,6 +556,10 @@ impl<R: Runtime> Moonbase<R> {
     }
 
     /// The license in force, if any.
+    ///
+    /// To decide whether to offer deactivating, read `revocable` on
+    /// [`state`](Self::state)'s license rather than [`License::is_revocable`]: it
+    /// also counts a refusal Moonbase gave this copy of the license.
     pub fn license(&self) -> Option<License> {
         self.inner().standing.license().cloned()
     }
@@ -595,12 +616,15 @@ impl<R: Runtime> Moonbase<R> {
         LicenseState {
             status,
             licensed: license.is_some(),
-            license: license.map(LicenseView::from),
+            license: license.map(|license| Self::license_view(&inner, license)),
             expired_trial: match &inner.standing {
                 Standing::TrialExpired(trial) => Some(LicenseView::from(trial)),
                 _ => None,
             },
-            not_covered: inner.standing.not_covered().map(NotCoveredLicense::view),
+            not_covered: inner.standing.not_covered().map(|not_covered| NotCovered {
+                license: Self::license_view(&inner, &not_covered.license),
+                ..not_covered.view()
+            }),
             lock_reason: inner.standing.lock_reason(),
             activation: inner.activation.clone(),
             busy: inner.deactivating.is_some(),
@@ -612,6 +636,21 @@ impl<R: Runtime> Moonbase<R> {
                 .unwrap_or_default(),
             add_ons: inner.add_ons.clone(),
         }
+    }
+
+    /// `license` as the frontend sees it, and not revocable once Moonbase has
+    /// refused to revoke this very copy of it.
+    fn license_view(inner: &Inner, license: &License) -> LicenseView {
+        let mut view = LicenseView::from(license);
+        if Self::refusal_for(inner, license).is_some() {
+            view.revocable = false;
+        }
+        view
+    }
+
+    /// Moonbase's refusal to revoke this copy of the license, when it gave one.
+    fn refusal_for<'a>(inner: &'a Inner, license: &License) -> Option<&'a RefusedRevocation> {
+        inner.refused_revocation.as_ref().filter(|refused| refused.token == license.token)
     }
 
     /// Whether `copy` is an older copy of the activation held, licensed or not
@@ -1053,8 +1092,14 @@ impl<R: Runtime> Moonbase<R> {
     /// revoked, so those are forgotten locally instead. When Moonbase cannot be
     /// reached the license is kept, and the error says so. Also hands back the seat
     /// of a license that doesn't cover this version of the app.
+    ///
+    /// A license the customer may not revoke ([`License::is_revocable`] is false) is
+    /// kept too, failing with [`moonbase::Error::LicenseNotRevocable`]. When it was
+    /// Moonbase that refused, the license is re-checked so that the copy here says
+    /// so as well. Until a newer copy arrives, the license counts as not revocable,
+    /// and deactivating again fails the same way without asking Moonbase.
     pub fn deactivate(&self) -> Result<LicenseState> {
-        let (generation, license) = {
+        let (generation, license, refused) = {
             let mut inner = self.inner();
             let Some(license) = inner.standing.held().cloned() else {
                 return Err(Error::NotLicensed);
@@ -1070,14 +1115,20 @@ impl<R: Runtime> Moonbase<R> {
             if inner.activation.is_some() {
                 return Err(Error::Busy("Finish or cancel the activation first".into()));
             }
+            let refused = Self::refusal_for(&inner, &license).map(|refused| refused.message.clone());
             inner.error = None;
             let generation = self.bump();
             inner.deactivating = Some(generation);
-            (generation, license)
+            (generation, license, refused)
         };
         self.emit();
 
-        let result = self.0.licensing.revoke_activation(&license.token);
+        // Moonbase has refused this very copy already, and would again.
+        let asked = refused.is_none();
+        let result = match refused {
+            Some(message) => Err(SdkError::LicenseNotRevocable(message)),
+            None => self.0.licensing.revoke_activation(&license.token),
+        };
 
         let mut inner = self.inner();
         if inner.deactivating == Some(generation) {
@@ -1088,6 +1139,9 @@ impl<R: Runtime> Moonbase<R> {
             self.emit();
             return Ok(self.state());
         }
+        // Moonbase refused a license that says it may be revoked, so the token is a
+        // validation behind the seller's setting.
+        let recheck = asked && matches!(result, Err(SdkError::LicenseNotRevocable(_))) && license.is_revocable();
         let outcome = match result {
             // A verdict means the server will never accept the token again, so
             // forgetting it here is all that is left to do.
@@ -1096,6 +1150,10 @@ impl<R: Runtime> Moonbase<R> {
             Err(error) => {
                 log::warn!("moonbase: revoke_activation failed, license kept: {error}");
                 inner.error = Some(failure(Activity::Deactivation, &error));
+                if recheck && let SdkError::LicenseNotRevocable(message) = &error {
+                    inner.refused_revocation =
+                        Some(RefusedRevocation { token: license.token.clone(), message: message.clone() });
+                }
                 Err(error)
             }
         };
@@ -1105,6 +1163,12 @@ impl<R: Runtime> Moonbase<R> {
         }
         drop(inner);
         self.emit();
+        // The window has stopped offering to deactivate already. A fresh copy says
+        // so itself, and says it for the next launch too. The error stays up: a
+        // re-check that succeeds leaves it alone.
+        if recheck && let Err(error) = self.refresh(true) {
+            log::debug!("moonbase: re-checking the license after a refused deactivation failed: {error}");
+        }
         outcome.map(|()| self.state()).map_err(Error::from)
     }
 
