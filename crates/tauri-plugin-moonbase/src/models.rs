@@ -196,7 +196,8 @@ pub struct UpdateInfo {
 
 /// A license as the frontend sees it: everything the SDK's [`License`] carries but
 /// the raw token, which the webview has no use for and is better off never
-/// holding, plus `days_remaining`. Serializes as the SDK's license JSON does.
+/// holding, plus `days_remaining`. Serializes as the SDK's license JSON does, but
+/// with `revocable` always present and already decided.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LicenseView {
@@ -224,6 +225,12 @@ pub struct LicenseView {
     pub seats_used: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub release_access: Option<ReleaseAccess>,
+    /// Whether the customer may deactivate this device, freeing its seat:
+    /// [`License::is_revocable`], and false once Moonbase has refused to revoke this
+    /// copy of the license, until a newer one arrives. Show "Deactivate" for an
+    /// online license only when this is true. It is false for every trial and
+    /// offline license, which are removed from the device rather than deactivated.
+    pub revocable: bool,
     pub properties: Value,
     /// Whole days until `expires_at`, rounded up, and 0 once it has passed. `None`
     /// when the license never expires.
@@ -250,6 +257,7 @@ impl From<&License> for LicenseView {
             seat_count,
             seats_used,
             release_access,
+            revocable: _,
             properties,
             token: _,
         } = license.clone();
@@ -273,6 +281,7 @@ impl From<&License> for LicenseView {
             seat_count,
             seats_used,
             release_access,
+            revocable: license.is_revocable(),
             properties,
             days_remaining,
         }

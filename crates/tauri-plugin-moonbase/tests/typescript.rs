@@ -89,6 +89,7 @@ fn license() -> LicenseView {
             up_to_major: Some(2),
             up_to_version: Some("2.3.0".into()),
         }),
+        revocable: true,
         properties: json!({"anything": 1}),
         days_remaining: Some(3),
     }
@@ -264,6 +265,7 @@ fn every_value_of_the_string_unions_is_typed() {
         ErrorType::StoreClosed,
         ErrorType::NoEligibleLicense,
         ErrorType::ReleaseNotCovered,
+        ErrorType::LicenseNotRevocable,
     ] {
         assert_union_has(&kind);
     }

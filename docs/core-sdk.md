@@ -253,6 +253,23 @@ with `Error::OperationNotSupported` without contacting the API. A token that has
 out locally can still be revoked, since its seat stays allocated until it is. There is
 no grace period: revocation is one-shot. Revoking frees the device's add-on seats too.
 
+A seller can also keep revoking to themselves, so that a customer can't free a seat of
+their product, online activations included. The license says so in its `revocable`
+claim, and `is_revocable()` reads it. Offer "Deactivate" only when it is true:
+
+```rust
+if license.is_revocable() {
+    // show "Deactivate this device"
+}
+```
+
+`is_revocable()` is never true for an offline or trial license. Revoking a license
+that says it can't be revoked fails with `Error::LicenseNotRevocable` without
+contacting the API. The token can be a validation behind the seller's setting, so
+Moonbase may refuse a revoke the device allowed; that fails with `LicenseNotRevocable`
+too. Either way the stored license stays where it is, and the next validation brings a
+token that says `revocable: false`.
+
 ## Add-ons
 
 An add-on (a sub-product, with a product ID like `my-app.drum-kit`) that the merchant
@@ -359,6 +376,7 @@ trying again can help:
 | `Configuration` | Bad options, an unparseable key, an empty device id | Fix the setup |
 | `Storage` | Reading or writing the stored license, or its lock, failed; `io_error()` (and `source()`) is the I/O failure behind it. No verdict on the license | Check the path and its permissions |
 | `OperationNotSupported` | The call can't apply to this license: revoking an offline or trial license, an add-on it can't take | Keep the license |
+| `LicenseNotRevocable` | Only the seller can revoke this activation; no verdict on the license | Keep the license, stop offering to deactivate |
 
 `is_license_invalid()` is true for `LicenseInvalid`, `DeviceMismatch` and
 `ReleaseNotCovered`, so a check for "refused" covers all three; the grace period relies
@@ -373,7 +391,8 @@ How each call maps what the API returns:
 | `get_requested_activation` | 204 or 404 | `Ok(None)` |
 | | 400 | `ActivationRequestEnded` (`LicenseExpired` only for an explicit `LicenseExpired`) |
 | `validate_token_online`, `revoke_activation` | 400 | `LicenseInvalid`, or `LicenseExpired` when `errorType` is `LicenseExpired`, or `ReleaseNotCovered` when it is `ReleaseNotCovered` |
-| | 403 or 404 | `Api`, covered by the grace period |
+| | `errorType: LicenseNotRevocable`, whatever the status (`/revoke` sends it as a 403) | `LicenseNotRevocable` |
+| | any other 403, or a 404 | `Api`, covered by the grace period |
 | `activate_sub_product`, `request_sub_product_trial`, `list_sub_products` | 400 with `errorType` `LicenseInvalid`, `LicenseRevoked` or `LicenseActivationRevoked` | `LicenseInvalid` (`LicenseExpired` for `LicenseExpired`) |
 | | 400 with `errorType: NoEligibleLicense` | `NoEligibleLicense` |
 | | any other 400 | `OperationNotSupported` with the server's reason |
@@ -385,9 +404,14 @@ How each call maps what the API returns:
 
 Only an answer that can only have come from Moonbase is definitive, because a verdict
 skips the grace period. A 2xx whose body is not a license token, such as a hotel
-Wi-Fi sign-in page, is an `Api` error. So is a 403 or 404: `/validate` and `/revoke`
-send those for a license that no longer exists, but as stock ASP.NET ProblemDetails,
-which a misrouted request gets from any other ASP.NET service too.
+Wi-Fi sign-in page, is an `Api` error. So is a 403 or 404 without an `errorType`:
+`/validate` and `/revoke` send those for a license that no longer exists, but as a
+generic problem details object, which a misrouted request can get from many other web
+services too. What does settle an answer is one of Moonbase's own `errorType`s, but
+settling the call is not the same as a verdict against the license.
+`LicenseNotRevocable` settles a revoke, and `StoreClosed` that the store has closed.
+Neither says anything against the license: `is_license_rejection()` is false for both,
+the grace period still covers them, and the license stays.
 
 ## Offline activation
 
@@ -522,6 +546,12 @@ Deliberate differences:
   unlocked since boot) heals itself.
 - There is no `legacy_cpp_device_id_resolver`: a new SDK has no fleet bound to the
   pre-spec algorithm.
+- `revoke_activation` reads the license's `revocable` claim. When the claim is `false`
+  it fails with `LicenseNotRevocable` without contacting the API, and Moonbase's own
+  refusal (`errorType: LicenseNotRevocable`) is `LicenseNotRevocable` too. moonbase-cpp
+  4.14 sends the revoke whatever the claim says and reports that refusal as
+  `api_error`, so where you caught `api_error` from `revoke_activation`, match
+  `LicenseNotRevocable` as well. Both keep the license.
 - `validate_token_online`, and so `load_and_validate`, asks Moonbase about an online
   license whose expiry has passed rather than failing with `LicenseExpired` on the
   device, so a subscription renewed, or a trial extended or bought, while the app was

@@ -250,14 +250,23 @@ fn api_error(response: &HttpResponse, problem: ProblemDetails) -> Error {
 /// stays an [`ApiError`] that is worth retrying.
 ///
 /// That includes a 403 or 404, although `/validate` and `/revoke` send those for a
-/// license that no longer exists or changed hands. Their body is stock ASP.NET
-/// ProblemDetails with no `errorType`, which a misrouted request gets from any
-/// other ASP.NET service too, and reading it as final would skip the offline grace
-/// period and lock a valid license over a routing fault.
+/// license that no longer exists or changed hands. Their body is a generic
+/// problem details object with no `errorType`, which a misrouted request can get
+/// from many other web services too, and reading it as final would skip the offline
+/// grace period and lock a valid license over a routing fault. Only Moonbase's own
+/// `errorType` settles one: `LicenseNotRevocable`, the 403 `/revoke` sends for an
+/// activation only the seller may revoke. That settles the revoke, not the license,
+/// which it says nothing against.
 pub(crate) fn error_for_problem(response: &HttpResponse) -> Error {
     let problem = parse_problem(&response.body);
     if let Some(closed) = store_closed(&problem) {
         return closed;
+    }
+    if problem.error_type == "LicenseNotRevocable" {
+        if problem.detail.is_empty() && problem.title.is_empty() {
+            return Error::not_revocable();
+        }
+        return Error::LicenseNotRevocable(problem_message(response.status, &problem));
     }
     if problem.error_type == "LicenseExpired" {
         return Error::LicenseExpired(problem_message(response.status, &problem));
@@ -575,7 +584,10 @@ impl LicenseClient {
         self.validator.validate_token(&response.body)
     }
 
-    /// Release this activation's seat on the server.
+    /// Release this activation's seat on the server. Fails with
+    /// [`Error::LicenseNotRevocable`] when Moonbase lets only the seller revoke it.
+    /// Unlike [`Licensing::revoke_activation`](crate::Licensing::revoke_activation),
+    /// it doesn't check the token locally first.
     pub fn revoke_activation(&self, token: &str) -> Result<()> {
         let response = self.post_token(&license_path(&self.options, "revoke"), token)?;
         if !response.is_success() {

@@ -21,6 +21,10 @@ const OTHER_KEY: &[u8] = include_bytes!("../fixtures/other-private.pk8");
 
 pub const DEVICE_ID: &str = "device-id";
 
+/// What `/revoke` answers for an activation of a product whose seller doesn't let
+/// customers revoke them.
+pub const NOT_REVOCABLE: &str = r#"{"title":"Not allowed","status":403,"detail":"Activations of this product can only be revoked by the seller","errorType":"LicenseNotRevocable"}"#;
+
 /// Which key signs a test token.
 #[derive(Clone, Copy)]
 pub enum Signer {

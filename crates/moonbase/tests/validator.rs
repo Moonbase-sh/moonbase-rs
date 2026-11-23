@@ -87,6 +87,44 @@ fn a_public_key_is_accepted_in_every_common_text_shape() {
 }
 
 #[test]
+fn the_revocable_claim_is_read_and_a_missing_one_counts_as_revocable() {
+    let read = |value: Option<serde_json::Value>| {
+        let claims = match value {
+            Some(value) => with(claims(), "revocable", value),
+            None => without(claims(), "revocable"),
+        };
+        let license = validator().validate_token(&make_token(&claims)).unwrap();
+        (license.revocable, license.is_revocable())
+    };
+    assert_eq!(read(Some(json!(true))), (Some(true), true));
+    assert_eq!(read(Some(json!(false))), (Some(false), false));
+    // A token issued before Moonbase sent the claim, such as an old license file.
+    assert_eq!(read(None), (None, true));
+    assert_eq!(read(Some(json!(null))), (None, true));
+    // Spelled as the trial flag may be.
+    assert_eq!(read(Some(json!("false"))), (Some(false), false));
+    assert_eq!(read(Some(json!("True"))), (Some(true), true));
+    // A shape it doesn't know reads as missing rather than failing the license.
+    assert_eq!(read(Some(json!(0))), (None, true));
+    assert_eq!(read(Some(json!({"customer": false}))), (None, true));
+}
+
+#[test]
+fn offline_and_trial_licenses_are_never_revocable_whatever_the_claim() {
+    for kind in [("method", json!("Offline")), ("trial", json!(true))] {
+        for revocable in [None, Some(true), Some(false)] {
+            let mut claims = with(claims(), kind.0, kind.1.clone());
+            if let Some(revocable) = revocable {
+                claims = with(claims, "revocable", json!(revocable));
+            }
+            let license = validator().validate_token(&make_token(&claims)).unwrap();
+            assert_eq!(license.revocable, revocable);
+            assert!(!license.is_revocable(), "{kind:?} with revocable {revocable:?}");
+        }
+    }
+}
+
+#[test]
 fn the_validation_time_can_fall_back_to_the_legacy_ver_claim() {
     let claims = with(without(claims(), "validated"), "ver", json!("2026-01-02T03:04:05.678Z"));
     let license = validator().validate_token(&make_token(&claims)).unwrap();

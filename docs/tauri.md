@@ -120,7 +120,9 @@ The screens, all driven by the license state:
   what the license covers and offers the upgrade; see
   [Licenses that cover some versions](#licenses-that-cover-some-versions).
 - **License details**: who it is licensed to, the plan and expiry, the license id with a
-  Copy button for support, seats used, and Deactivate.
+  Copy button for support, seats used, and Deactivate. Deactivate is left out for a
+  license the customer may not revoke, whose seller frees seats themselves; a trial or
+  offline license has "Remove from this device" instead.
 - **Add-ons** (with `show_addons`): the product's add-ons from Moonbase, each with
   where it stands on this computer and a Try free, Buy or Activate action. See
   [Add-ons](#add-ons).
@@ -226,7 +228,7 @@ render(await moonbase.state())
 | `activate({ offline })` | `activate` | Start a browser activation; resolves once the request exists, then polls in the background |
 | `cancelActivation()` | `cancel_activation` | Stop waiting; a license held from before stays |
 | `refresh({ force })` | `refresh` | Re-check online now (after a purchase, say); `force` (default true) skips the throttle |
-| `deactivate()` | `deactivate` | Free the seat and lock; trials and offline licenses are forgotten locally. Refused (`busy`) while an activation is in progress |
+| `deactivate()` | `deactivate` | Free the seat and lock; trials and offline licenses are forgotten locally. Refused (`busy`) while an activation is in progress, and refused (`licenseNotRevocable`), keeping the license, when the customer may not revoke it |
 | `forget()` | `forget` | Forget the license on this device only |
 | `deviceToken()` | `device_token` | The machine file for offline activation |
 | `activateOffline(text)` | `activate_offline` | Activate from the contents of the license file the customer got back |
@@ -268,7 +270,11 @@ The rest of the state:
   license during `activating`, so check this rather than the status.
 - `license`: the license in the SDK's JSON shape, without the raw token (the webview
   has no use for it), plus `daysRemaining`. In Rust it is a `LicenseView`, which has no
-  token field to leak.
+  token field to leak. Its `revocable` says whether the customer may deactivate this
+  device: show Deactivate for an online license only when it is true. It is false for
+  every trial and offline license, which `deactivate()` removes from the device instead.
+  It is also false once Moonbase has refused to revoke the license held, which can be a
+  validation behind the seller's setting, until a newer copy of the license arrives.
 - `lockReason`: `deactivated`, `expired`, `invalid`, `unverified` or `notCovered`, so
   the welcome screen can say why the app locked.
 - `activation.browserOpenFailed`: the browser couldn't be opened for the activation

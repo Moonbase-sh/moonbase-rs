@@ -581,6 +581,11 @@ impl Licensing {
     /// API. There is no grace-period fallback: revocation is one-shot. A token that
     /// has aged out locally can still be revoked, since its seat stays allocated
     /// until it is.
+    ///
+    /// A license the customer may not revoke ([`License::is_revocable`] is false)
+    /// fails with [`Error::LicenseNotRevocable`], also without contacting the API.
+    /// Moonbase refuses with the same error when the token predates the seller's
+    /// setting. Either way the stored license stays: it is as good as it was.
     pub fn revoke_activation(&self, token: &str) -> Result<()> {
         let local = self.validator.validate_token_allow_expired(token)?;
         if local.method == ActivationMethod::Offline {
@@ -589,7 +594,11 @@ impl Licensing {
         if local.trial {
             return Err(Error::OperationNotSupported("Trial licenses cannot be revoked".into()));
         }
+        if !local.is_revocable() {
+            return Err(Error::not_revocable());
+        }
 
+        // A refusal returns here, before the store is touched.
         self.client.revoke_activation(token)?;
 
         // Best-effort: the seat is already free, so a local I/O failure must not

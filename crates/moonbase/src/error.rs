@@ -36,6 +36,9 @@ pub enum ErrorType {
     NoEligibleLicense,
     /// The license is valid but doesn't cover this version of the app.
     ReleaseNotCovered,
+    /// The customer may not revoke this activation: only the seller can free its
+    /// seat.
+    LicenseNotRevocable,
 }
 
 /// A request that got no definitive answer.
@@ -75,7 +78,7 @@ impl ApiError {
         &self.message
     }
 
-    /// The problem's `title`, when the server sent ProblemDetails.
+    /// The problem's `title`, when the server sent problem details.
     pub fn title(&self) -> &str {
         &self.title
     }
@@ -159,6 +162,7 @@ impl std::error::Error for StorageError {
 /// | [`StoreClosed`](Self::StoreClosed) | The merchant closed their account; no verdict on the license | Treat it like being offline |
 /// | [`ActivationRequestEnded`](Self::ActivationRequestEnded) | A browser activation can never complete | Start a new request |
 /// | [`NoEligibleLicense`](Self::NoEligibleLicense) | No seat of an add-on to give; no verdict on the license | Offer to buy the add-on, or free a seat |
+/// | [`LicenseNotRevocable`](Self::LicenseNotRevocable) | Only the seller can revoke this activation; no verdict on the license | Keep the license, hide "Deactivate" |
 /// | [`Configuration`](Self::Configuration) | Bad options, or an empty device id | Fix the setup |
 ///
 /// [`is_license_rejection`](Self::is_license_rejection) groups the definitive
@@ -244,6 +248,16 @@ pub enum Error {
     /// which is as good as it was.
     #[error("{0}")]
     NoEligibleLicense(String),
+
+    /// The customer may not revoke this activation: the seller frees its seat
+    /// themselves. [`Licensing::revoke_activation`](crate::Licensing::revoke_activation)
+    /// fails with it without contacting the API when the license says so
+    /// ([`License::is_revocable`](crate::License::is_revocable)), and Moonbase refuses
+    /// with it (`errorType: LicenseNotRevocable`) when the token is older than the
+    /// seller's setting. Not a verdict on the license, which is as good as it was:
+    /// keep it, and stop offering to deactivate.
+    #[error("{0}")]
+    LicenseNotRevocable(String),
 }
 
 impl Error {
@@ -252,6 +266,12 @@ impl Error {
             platform: platform.into(),
             reason: "no identity parameter could be read".into(),
         }
+    }
+
+    /// Refusing to revoke an activation only the seller may revoke, when there is
+    /// nothing better to say.
+    pub(crate) fn not_revocable() -> Self {
+        Self::LicenseNotRevocable("Only the seller can revoke this activation".into())
     }
 
     pub fn error_type(&self) -> ErrorType {
@@ -268,6 +288,7 @@ impl Error {
             Self::Storage(_) => ErrorType::StorageError,
             Self::OperationNotSupported(_) => ErrorType::OperationNotSupported,
             Self::NoEligibleLicense(_) => ErrorType::NoEligibleLicense,
+            Self::LicenseNotRevocable(_) => ErrorType::LicenseNotRevocable,
         }
     }
 

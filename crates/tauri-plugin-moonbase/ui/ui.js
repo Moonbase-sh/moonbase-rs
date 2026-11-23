@@ -579,11 +579,13 @@ function createActivationUI({ root, config, invoke, mode, onHeight }) {
             h('div', { class: 'title' }, seatCount ? `Activations · ${used ?? '?'} of ${seatCount} ${seatCount === 1 ? 'device' : 'devices'}` : license.activationMethod === 'Offline' ? 'Activated offline on this device' : 'Activated on this device'),
             pipCount > 0 && h('div', { class: 'pips' }, Array.from({ length: pipCount }, (_, index) => h('span', { class: `pip${index < (used ?? 0) ? ' used' : ''}` }))),
           ),
-          h(
-            'button',
-            { class: 'danger-button', type: 'button', disabled: state.busy, onClick: () => run(() => invoke('deactivate')) },
-            state.busy ? [spinner(13), 'Deactivating…'] : license.trial || license.activationMethod === 'Offline' ? 'Remove from this device' : 'Deactivate this device',
-          ),
+          // Hidden for an activation the merchant keeps revoking to themselves. A trial or offline one is removed here instead.
+          (license.trial || license.activationMethod === 'Offline' || license.revocable !== false) &&
+            h(
+              'button',
+              { class: 'danger-button', type: 'button', disabled: state.busy, onClick: () => run(() => invoke('deactivate')) },
+              state.busy ? [spinner(13), 'Deactivating…'] : license.trial || license.activationMethod === 'Offline' ? 'Remove from this device' : 'Deactivate this device',
+            ),
         ),
         errorLine(state.error?.message),
         // Add-ons are activated and tried from a full license.

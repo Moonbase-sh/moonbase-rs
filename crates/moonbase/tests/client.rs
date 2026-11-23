@@ -13,7 +13,7 @@ use moonbase::{
 };
 use serde_json::{Value, json};
 
-// ASP.NET's NotFound() as the API serves it.
+// A bare 404 problem, as the API serves one.
 const API_NOT_FOUND: &str = r#"{"type":"https://tools.ietf.org/html/rfc9110#section-15.5.5","title":"Not Found","status":404,"traceId":"00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"}"#;
 
 // What the API answers every request to a closed store with.
@@ -355,6 +355,33 @@ fn a_403_or_404_on_validate_or_revoke_stays_retryable_even_as_problem_details() 
     let error = f.licensing.client().revoke_activation("token").unwrap_err();
     assert_eq!(error.to_string(), "User does not own license");
     assert_eq!(api_status(error), 403);
+}
+
+#[test]
+fn moonbase_refusing_to_revoke_is_read_from_its_error_type_whatever_the_status() {
+    for code in [403, 400] {
+        let f = fixture([status(code, NOT_REVOCABLE)]);
+        let error = f.licensing.client().revoke_activation("token").unwrap_err();
+        assert!(matches!(&error, Error::LicenseNotRevocable(_)), "HTTP {code} gave {error:?}");
+        assert_eq!(error.to_string(), "Activations of this product can only be revoked by the seller");
+        assert_eq!(error.error_type(), ErrorType::LicenseNotRevocable);
+        assert!(!error.is_license_rejection());
+    }
+
+    // With nothing to quote, it still says what happened.
+    let f = fixture([status(403, r#"{"errorType":"LicenseNotRevocable"}"#)]);
+    let error = f.licensing.client().revoke_activation("token").unwrap_err();
+    assert_eq!(error.to_string(), "Only the seller can revoke this activation");
+}
+
+#[test]
+fn a_403_saying_the_same_without_the_error_type_stays_retryable() {
+    let body = r#"{"title":"Not allowed","status":403,"detail":"Activations of this product can only be revoked by the seller"}"#;
+    let f = fixture([status(403, body)]);
+    assert_eq!(api_status(f.licensing.client().revoke_activation("token").unwrap_err()), 403);
+
+    let f = fixture([status(403, "<!DOCTYPE html><html><body>Blocked by policy</body></html>")]);
+    assert_eq!(api_status(f.licensing.client().revoke_activation("token").unwrap_err()), 403);
 }
 
 #[test]
